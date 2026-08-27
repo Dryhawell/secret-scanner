@@ -1,30 +1,14 @@
-"""Scan orchestration.
-
-Discover candidate files, then run the detector on each one. Later phases
-will wrap findings in a richer ScanResult model.
-"""
+"""Scan orchestration: discover files, detect secrets, return ScanResult."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
-from scanner.detector import Detection, Detector
+from scanner.detector import Detector
 from scanner.file_handler import ScanConfig, iter_scan_files
+from scanner.models import ScanResult, SecretFinding
 from scanner.patterns import PatternEngine
-
-
-@dataclass(frozen=True)
-class ScanSummary:
-    """PHASE 4 scan outcome. Promoted to ScanResult in a later phase."""
-
-    target: Path
-    files_scanned: int
-    findings: list[Detection]
-
-    @property
-    def findings_count(self) -> int:
-        return len(self.findings)
 
 
 class Scanner:
@@ -43,20 +27,27 @@ class Scanner:
         """Return scan-candidate files under ``target``."""
         return list(iter_scan_files(target, self.config))
 
-    def scan(self, target: str | Path) -> ScanSummary:
-        """Discover files, detect secrets, return a summary.
+    def scan(self, target: str | Path) -> ScanResult:
+        """Discover files, detect secrets, return a structured result.
 
         Findings store masked values only. Plaintext matches stay inside
         PatternEngine for the duration of a single line, then are dropped.
         """
+        started_at = datetime.now(timezone.utc)
         root = Path(target).expanduser()
         files = self.discover_files(root)
-        findings: list[Detection] = []
+        findings: list[SecretFinding] = []
+        lines_scanned = 0
         for path in files:
-            findings.extend(self.detector.scan_file(path))
+            file_scan = self.detector.scan_file(path)
+            findings.extend(file_scan.findings)
+            lines_scanned += file_scan.lines_scanned
         resolved = root.resolve() if root.exists() else root
-        return ScanSummary(
+        return ScanResult(
             target=resolved,
+            started_at=started_at,
+            finished_at=datetime.now(timezone.utc),
             files_scanned=len(files),
-            findings=findings,
+            lines_scanned=lines_scanned,
+            findings=tuple(findings),
         )

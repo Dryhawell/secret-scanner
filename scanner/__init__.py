@@ -3,20 +3,21 @@
 Holds file discovery, pattern matching, and finding models.
 """
 
-from scanner.detector import Detection, Detector, mask_secret
+from scanner.detector import Detector, FileScan, mask_secret
 from scanner.file_handler import ScanConfig
-from scanner.models import PatternMatch, SecretPattern, Severity
+from scanner.models import PatternMatch, ScanResult, SecretFinding, SecretPattern, Severity
 from scanner.patterns import PatternEngine
-from scanner.scanner import Scanner, ScanSummary
+from scanner.scanner import Scanner
 
 __all__ = [
-    "Detection",
     "Detector",
+    "FileScan",
     "PatternEngine",
     "PatternMatch",
     "ScanConfig",
-    "ScanSummary",
+    "ScanResult",
     "Scanner",
+    "SecretFinding",
     "SecretPattern",
     "Severity",
     "mask_secret",

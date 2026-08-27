@@ -1,8 +1,7 @@
 """Secret detection: apply compiled patterns to file contents.
 
-This module reads files line by line, asks PatternEngine for hits, and
-stores *masked* values only. It does not decide false positives, context,
-or confidence — those arrive in later phases.
+Reads files line by line, asks PatternEngine for hits, and stores *masked*
+values only. False positives, context, and confidence arrive later.
 """
 
 from __future__ import annotations
@@ -10,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from scanner.models import Severity
+from scanner.models import SecretFinding
 from scanner.patterns import PatternEngine
 
 # Lines longer than this are skipped. A minified 5 MB line can freeze a regex
@@ -33,15 +32,11 @@ def mask_secret(value: str, visible_prefix: int = 4) -> str:
 
 
 @dataclass(frozen=True)
-class Detection:
-    """One pattern hit in a file. Holds no plaintext secret."""
+class FileScan:
+    """Findings plus how many physical lines were visited in one file."""
 
-    file_path: Path
-    line_number: int
-    pattern_name: str
-    severity: Severity
-    masked_value: str
-    description: str
+    findings: tuple[SecretFinding, ...]
+    lines_scanned: int
 
 
 class Detector:
@@ -55,38 +50,37 @@ class Detector:
         self.engine = engine or PatternEngine()
         self.max_line_length = max_line_length
 
-    def scan_line(self, line: str, file_path: Path, line_number: int) -> list[Detection]:
-        """Return detections for one line. The line itself is not stored."""
+    def scan_line(self, line: str, file_path: Path, line_number: int) -> list[SecretFinding]:
+        """Return findings for one line. The line itself is not stored."""
         if len(line) > self.max_line_length:
             return []
 
-        detections: list[Detection] = []
+        findings: list[SecretFinding] = []
         for match in self.engine.find_in_text(line):
-            detections.append(
-                Detection(
+            findings.append(
+                SecretFinding(
                     file_path=file_path,
                     line_number=line_number,
-                    pattern_name=match.pattern_name,
+                    secret_type=match.pattern_name,
                     severity=match.severity,
                     masked_value=mask_secret(match.matched_text),
                     description=match.description,
+                    pattern_name=match.pattern_name,
                 )
             )
-        return detections
+        return findings
 
-    def scan_file(self, path: Path) -> list[Detection]:
-        """Read ``path`` line by line and collect detections.
-
-        The whole file is never loaded as one string. Unreadable files
-        yield no detections rather than aborting the scan.
-        """
-        detections: list[Detection] = []
+    def scan_file(self, path: Path) -> FileScan:
+        """Read ``path`` line by line. Unreadable files yield an empty result."""
+        findings: list[SecretFinding] = []
+        lines_scanned = 0
         try:
             with path.open("r", encoding="utf-8", errors="replace") as handle:
                 for line_number, line in enumerate(handle, start=1):
-                    detections.extend(
+                    lines_scanned = line_number
+                    findings.extend(
                         self.scan_line(line.rstrip("\n"), path, line_number)
                     )
         except OSError:
-            return []
-        return detections
+            return FileScan(findings=(), lines_scanned=0)
+        return FileScan(findings=tuple(findings), lines_scanned=lines_scanned)
