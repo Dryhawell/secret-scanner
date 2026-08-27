@@ -10,7 +10,7 @@ import re
 
 
 class Severity(StrEnum):
-    """How urgent a match is. Expanded into a full system in a later phase."""
+    """Triage label. Policy lives in scanner.severity, not on this enum."""
 
     CRITICAL = "CRITICAL"
     HIGH = "HIGH"

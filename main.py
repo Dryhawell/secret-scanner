@@ -9,14 +9,8 @@ import sys
 from pathlib import Path
 
 from scanner import Scanner
-from scanner.models import SecretFinding, Severity
-
-_SEVERITY_ORDER = {
-    Severity.CRITICAL: 0,
-    Severity.HIGH: 1,
-    Severity.MEDIUM: 2,
-    Severity.LOW: 3,
-}
+from scanner.models import SecretFinding
+from scanner.severity import count_by_severity, format_severity_counts, sort_findings
 
 
 def _print_finding(finding: SecretFinding, target: Path) -> None:
@@ -43,14 +37,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: {exc}")
         return 2
 
-    findings = sorted(
+    findings = sort_findings(
         result.findings,
-        key=lambda item: (
-            _SEVERITY_ORDER[item.severity],
-            item.location(root=target),
-            item.line_number,
-        ),
+        location_of=lambda item: item.location(root=target),
     )
+    counts = count_by_severity(findings)
 
     print("Secret Scanner")
     print()
@@ -59,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Files scanned: {result.files_scanned}")
     print(f"Lines scanned: {result.lines_scanned:,}")
     print(f"Potential secrets found: {result.findings_count}")
+    print(f"By severity: {format_severity_counts(counts)}")
     print()
 
     if findings:

@@ -8,6 +8,7 @@ from scanner.file_handler import ScanConfig
 from scanner.models import PatternMatch, ScanResult, SecretFinding, SecretPattern, Severity
 from scanner.patterns import PatternEngine
 from scanner.scanner import Scanner
+from scanner.severity import meets_minimum, severity_for
 
 __all__ = [
     "Detector",
@@ -21,4 +22,6 @@ __all__ = [
     "SecretPattern",
     "Severity",
     "mask_secret",
+    "meets_minimum",
+    "severity_for",
 ]

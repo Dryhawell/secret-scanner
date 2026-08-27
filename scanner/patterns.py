@@ -12,7 +12,8 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 
-from scanner.models import PatternMatch, SecretPattern, Severity
+from scanner.models import PatternMatch, SecretPattern
+from scanner.severity import severity_for
 
 
 def default_patterns() -> list[SecretPattern]:
@@ -24,49 +25,49 @@ def default_patterns() -> list[SecretPattern]:
         SecretPattern(
             name="AWS Access Key ID",
             regex=r"(?<![A-Z0-9])AKIA[0-9A-Z]{16}(?![A-Z0-9])",
-            severity=Severity.CRITICAL,
+            severity=severity_for("AWS Access Key ID"),
             description="AWS access key IDs start with AKIA followed by 16 uppercase alphanumerics.",
         ),
         SecretPattern(
             name="GitHub Token",
             regex=r"(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36}",
-            severity=Severity.HIGH,
+            severity=severity_for("GitHub Token"),
             description="Classic GitHub tokens use a three-letter prefix, underscore, then 36 characters.",
         ),
         SecretPattern(
             name="GitHub Fine-Grained Token",
             regex=r"github_pat_[A-Za-z0-9_]{22,}",
-            severity=Severity.HIGH,
+            severity=severity_for("GitHub Fine-Grained Token"),
             description="Fine-grained GitHub PATs start with github_pat_ and a long alphanumeric payload.",
         ),
         SecretPattern(
             name="Google API Key",
             regex=r"AIza[0-9A-Za-z\-_]{35}",
-            severity=Severity.HIGH,
+            severity=severity_for("Google API Key"),
             description="Google API keys start with AIza and continue for 35 URL-safe characters.",
         ),
         SecretPattern(
             name="Stripe API Key",
             regex=r"(?<![A-Za-z0-9])(?:sk|pk)_(?:live|test)_[A-Za-z0-9]{16,}",
-            severity=Severity.HIGH,
+            severity=severity_for("Stripe API Key"),
             description="Stripe keys look like sk_live_, sk_test_, pk_live_, or pk_test_ plus a payload.",
         ),
         SecretPattern(
             name="JWT",
             regex=r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b",
-            severity=Severity.HIGH,
+            severity=severity_for("JWT"),
             description="JWTs are three base64url segments. The header almost always starts with eyJ.",
         ),
         SecretPattern(
             name="Private Key",
             regex=r"-----BEGIN (?:RSA |DSA |EC |OPENSSH )?PRIVATE KEY-----",
-            severity=Severity.CRITICAL,
+            severity=severity_for("Private Key"),
             description="PEM private keys are marked by a BEGIN PRIVATE KEY header, not the public key header.",
         ),
         SecretPattern(
             name="Generic API Key",
             regex=r"\b(?:api[_-]?key|apikey)\s*[:=]\s*(['\"])([A-Za-z0-9_\-]{16,})\1",
-            severity=Severity.HIGH,
+            severity=severity_for("Generic API Key"),
             description="Assignment of api_key / api-key to a quoted value of at least 16 characters.",
             flags=re.IGNORECASE,
             value_group=2,
@@ -74,7 +75,7 @@ def default_patterns() -> list[SecretPattern]:
         SecretPattern(
             name="Generic Password",
             regex=r"\b(?:password|passwd|pwd)\s*[:=]\s*(['\"])([^'\"]{8,})\1",
-            severity=Severity.MEDIUM,
+            severity=severity_for("Generic Password"),
             description="Assignment of password / passwd / pwd to a quoted value of at least 8 characters.",
             flags=re.IGNORECASE,
             value_group=2,
@@ -82,7 +83,7 @@ def default_patterns() -> list[SecretPattern]:
         SecretPattern(
             name="Database Connection String",
             regex=r"(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|mssql|mariadb)://[^\s'\"<>]+",
-            severity=Severity.HIGH,
+            severity=severity_for("Database Connection String"),
             description="Database URLs often embed username and password in the scheme://user:pass@host form.",
             flags=re.IGNORECASE,
         ),
