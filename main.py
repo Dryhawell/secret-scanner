@@ -50,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Files scanned: {result.files_scanned}")
     print(f"Lines scanned: {result.lines_scanned:,}")
     print(f"Potential secrets found: {result.findings_count}")
+    print(f"Placeholders ignored: {result.placeholders_ignored}")
     print(f"By severity: {format_severity_counts(counts)}")
     print()
 

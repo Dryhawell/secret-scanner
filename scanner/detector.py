@@ -1,7 +1,8 @@
 """Secret detection: apply compiled patterns to file contents.
 
-Reads files line by line, asks PatternEngine for hits, and stores *masked*
-values only. False positives, context, and confidence arrive later.
+Reads files line by line, asks PatternEngine for hits, stores *masked*
+values only, and drops obvious placeholders. Context and confidence
+arrive in later phases.
 """
 
 from __future__ import annotations
@@ -9,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from scanner.filters import is_placeholder
 from scanner.models import SecretFinding
 from scanner.patterns import PatternEngine
 
@@ -37,6 +39,7 @@ class FileScan:
 
     findings: tuple[SecretFinding, ...]
     lines_scanned: int
+    placeholders_ignored: int = 0
 
 
 class Detector:
@@ -50,13 +53,19 @@ class Detector:
         self.engine = engine or PatternEngine()
         self.max_line_length = max_line_length
 
-    def scan_line(self, line: str, file_path: Path, line_number: int) -> list[SecretFinding]:
-        """Return findings for one line. The line itself is not stored."""
+    def scan_line(
+        self, line: str, file_path: Path, line_number: int
+    ) -> tuple[list[SecretFinding], int]:
+        """Return (findings, placeholders_ignored) for one line."""
         if len(line) > self.max_line_length:
-            return []
+            return [], 0
 
         findings: list[SecretFinding] = []
+        ignored = 0
         for match in self.engine.find_in_text(line):
+            if is_placeholder(match.matched_text):
+                ignored += 1
+                continue
             findings.append(
                 SecretFinding(
                     file_path=file_path,
@@ -68,19 +77,26 @@ class Detector:
                     pattern_name=match.pattern_name,
                 )
             )
-        return findings
+        return findings, ignored
 
     def scan_file(self, path: Path) -> FileScan:
         """Read ``path`` line by line. Unreadable files yield an empty result."""
         findings: list[SecretFinding] = []
         lines_scanned = 0
+        ignored = 0
         try:
             with path.open("r", encoding="utf-8", errors="replace") as handle:
                 for line_number, line in enumerate(handle, start=1):
                     lines_scanned = line_number
-                    findings.extend(
-                        self.scan_line(line.rstrip("\n"), path, line_number)
+                    line_findings, line_ignored = self.scan_line(
+                        line.rstrip("\n"), path, line_number
                     )
+                    findings.extend(line_findings)
+                    ignored += line_ignored
         except OSError:
-            return FileScan(findings=(), lines_scanned=0)
-        return FileScan(findings=tuple(findings), lines_scanned=lines_scanned)
+            return FileScan(findings=(), lines_scanned=0, placeholders_ignored=0)
+        return FileScan(
+            findings=tuple(findings),
+            lines_scanned=lines_scanned,
+            placeholders_ignored=ignored,
+        )

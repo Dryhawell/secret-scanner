@@ -38,10 +38,12 @@ class Scanner:
         files = self.discover_files(root)
         findings: list[SecretFinding] = []
         lines_scanned = 0
+        placeholders_ignored = 0
         for path in files:
             file_scan = self.detector.scan_file(path)
             findings.extend(file_scan.findings)
             lines_scanned += file_scan.lines_scanned
+            placeholders_ignored += file_scan.placeholders_ignored
         resolved = root.resolve() if root.exists() else root
         return ScanResult(
             target=resolved,
@@ -50,4 +52,5 @@ class Scanner:
             files_scanned=len(files),
             lines_scanned=lines_scanned,
             findings=tuple(findings),
+            placeholders_ignored=placeholders_ignored,
         )

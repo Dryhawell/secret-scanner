@@ -86,6 +86,7 @@ class ScanResult:
     files_scanned: int
     lines_scanned: int
     findings: tuple[SecretFinding, ...]
+    placeholders_ignored: int = 0
 
     @property
     def findings_count(self) -> int:
