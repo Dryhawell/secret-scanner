@@ -1,4 +1,4 @@
-"""Scanner discovery tests. Detection is not implemented yet."""
+"""Scanner discovery and scan-orchestration tests."""
 
 from pathlib import Path
 
