@@ -12,6 +12,7 @@ def test_token_and_secret_names_are_sensitive() -> None:
     assert is_sensitive_identifier("SECRET_KEY")
     assert is_sensitive_identifier("client_secret")
     assert is_sensitive_identifier("api-key")
+    assert is_sensitive_identifier("AWS_ACCESS_KEY_ID")
 
 
 def test_ordinary_names_are_not_sensitive() -> None:

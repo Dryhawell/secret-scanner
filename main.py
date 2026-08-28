@@ -17,6 +17,7 @@ def _print_finding(finding: SecretFinding, target: Path) -> None:
     print(finding.severity.value)
     print(finding.location(root=target))
     print(finding.secret_type)
+    print(f"Confidence: {finding.confidence}%")
     print(finding.masked_value)
     print()
 

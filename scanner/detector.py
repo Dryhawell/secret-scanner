@@ -1,8 +1,8 @@
 """Secret detection: apply compiled patterns to file contents.
 
 Reads files line by line, applies format patterns, then context analysis
-for sensitive assignments. Placeholder values are dropped. Confidence
-and entropy arrive in later phases.
+for sensitive assignments. Placeholder values are dropped. Confidence is a detection score, not a
+verdict. Shannon entropy arrives in a later phase.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from scanner.confidence import calculate_confidence
 from scanner.context import CONTEXTUAL_PATTERN_NAME, find_context_hits
 from scanner.filters import is_placeholder
 from scanner.models import SecretFinding
@@ -86,6 +87,9 @@ class Detector:
                     masked_value=mask_secret(match.matched_text),
                     description=match.description,
                     pattern_name=match.pattern_name,
+                    confidence=calculate_confidence(
+                        match.pattern_name, match.matched_text, line
+                    ),
                 )
             )
 
@@ -108,6 +112,9 @@ class Detector:
                         "without a known vendor-specific secret format."
                     ),
                     pattern_name=CONTEXTUAL_PATTERN_NAME,
+                    confidence=calculate_confidence(
+                        CONTEXTUAL_PATTERN_NAME, hit.value, line
+                    ),
                 )
             )
         return findings, ignored

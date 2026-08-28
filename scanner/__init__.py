@@ -3,6 +3,7 @@
 Holds file discovery, pattern matching, and finding models.
 """
 
+from scanner.confidence import calculate_confidence
 from scanner.context import CONTEXTUAL_PATTERN_NAME, is_sensitive_identifier
 from scanner.detector import Detector, FileScan, mask_secret
 from scanner.filters import is_placeholder
@@ -14,6 +15,7 @@ from scanner.severity import meets_minimum, severity_for
 
 __all__ = [
     "CONTEXTUAL_PATTERN_NAME",
+    "calculate_confidence",
     "Detector",
     "FileScan",
     "is_placeholder",

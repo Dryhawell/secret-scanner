@@ -80,6 +80,8 @@ def is_sensitive_identifier(name: str) -> bool:
         return True
     if "private" in tokens and "key" in tokens:
         return True
+    if "access" in tokens and "key" in tokens:
+        return True
     return any(token in _HINT_TOKENS for token in tokens)
 
 

@@ -52,7 +52,7 @@ class SecretFinding:
     """One user-facing finding. Never stores the plaintext secret.
 
     ``line_number`` is 1-based, matching how editors and GitHub show files.
-    ``confidence`` is reserved for a later phase; it is not a security verdict.
+    ``confidence`` is detection confidence (0–99), never a proof of exploitability.
     """
 
     file_path: Path
@@ -63,7 +63,7 @@ class SecretFinding:
     description: str
     pattern_name: str
     timestamp: datetime = field(default_factory=_utc_now)
-    confidence: float | None = None
+    confidence: int = 0
 
     def location(self, root: Path | None = None) -> str:
         """Return ``path:line`` in GitHub-style form, using forward slashes."""
