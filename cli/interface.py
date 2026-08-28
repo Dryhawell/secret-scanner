@@ -19,6 +19,7 @@ from scanner.severity import (
     meets_minimum,
     sort_findings,
 )
+from utils.logger import get_logger, setup_logging
 from utils.reporter import dumps_report, write_json_report
 
 _RESET = "\033[0m"
@@ -41,6 +42,7 @@ examples:
   python main.py . --format json
   python main.py . --output reports/latest.json
   python main.py . --format json -o -
+  python main.py . --verbose
 """
 
 
@@ -102,6 +104,12 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="FILE",
         help="Write JSON to FILE (use - for stdout). Without --output, "
         "--format json writes reports/scan_YYYY-MM-DD_HHMM.json",
+    )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Write DEBUG logs (per-file) to the log file",
     )
     return parser
 
@@ -201,17 +209,24 @@ def emit_json(
     return written
 
 
-def run(argv: list[str] | None = None, *, reports_dir: Path | None = None) -> int:
+def run(
+    argv: list[str] | None = None,
+    *,
+    reports_dir: Path | None = None,
+    log_file: Path | None = None,
+) -> int:
     parser = build_parser()
     namespace = parser.parse_args(argv)
     target = resolve_target(namespace)
     minimum = Severity(namespace.severity)
     color = _use_color(namespace.no_color)
+    setup_logging(log_file=log_file, verbose=namespace.verbose)
 
     scanner = Scanner(config=build_scan_config(namespace))
     try:
         result = scanner.scan(target)
     except FileNotFoundError as exc:
+        get_logger().error("Target does not exist: %s", target)
         print(f"Error: {exc}", file=sys.stderr)
         return 2
 

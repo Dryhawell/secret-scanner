@@ -14,6 +14,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from collections.abc import Iterator
 
+from utils.logger import get_logger
+
+_LOG = get_logger()
+
 # Directory names skipped anywhere in the tree (not only at the repo root).
 DEFAULT_EXCLUDED_DIRS: frozenset[str] = frozenset(
     {
@@ -178,7 +182,8 @@ def _walk_directory(directory: Path, config: ScanConfig) -> Iterator[Path]:
     """Recursively walk one directory using pathlib, not os.walk."""
     try:
         children = sorted(directory.iterdir(), key=lambda item: item.name.casefold())
-    except OSError:
+    except OSError as exc:
+        _LOG.error("Unable to read directory %s: %s", directory, exc.strerror or exc)
         return
 
     for child in children:
@@ -188,7 +193,8 @@ def _walk_directory(directory: Path, config: ScanConfig) -> Iterator[Path]:
         try:
             is_dir = child.is_dir()
             is_file = child.is_file()
-        except OSError:
+        except OSError as exc:
+            _LOG.error("Unable to read path %s: %s", child, exc.strerror or exc)
             continue
 
         if is_dir:

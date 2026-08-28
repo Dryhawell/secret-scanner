@@ -18,6 +18,9 @@ from scanner.filters import is_placeholder
 from scanner.models import SecretFinding
 from scanner.patterns import PatternEngine
 from scanner.severity import severity_for
+from utils.logger import get_logger
+
+_LOG = get_logger()
 
 # Lines longer than this are skipped. A minified 5 MB line can freeze a regex
 # and would load a huge string into memory anyway.
@@ -144,8 +147,19 @@ class Detector:
                     )
                     findings.extend(line_findings)
                     ignored += line_ignored
-        except OSError:
+        except OSError as exc:
+            _LOG.error("Unable to read file %s: %s", path, exc.strerror or exc)
             return FileScan(findings=(), lines_scanned=0, placeholders_ignored=0)
+        if findings:
+            for finding in findings:
+                _LOG.warning(
+                    "Potential secret detected: %s at %s:%s (%s, confidence=%s%%)",
+                    finding.pattern_name,
+                    path.name,
+                    finding.line_number,
+                    finding.severity.value,
+                    finding.confidence,
+                )
         return FileScan(
             findings=tuple(findings),
             lines_scanned=lines_scanned,
