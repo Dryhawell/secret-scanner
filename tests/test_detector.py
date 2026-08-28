@@ -127,3 +127,35 @@ def test_skips_extremely_long_line(tmp_path: Path) -> None:
     file_scan = Detector().scan_file(target)
     assert file_scan.findings == ()
     assert file_scan.lines_scanned == 1
+
+
+def test_detects_github_token_and_private_key_headers(tmp_path: Path) -> None:
+    github = "ghp_" + ("B" * 36)
+    target = tmp_path / "secrets.py"
+    target.write_text(
+        f"GITHUB = '{github}'\n"
+        "-----BEGIN RSA PRIVATE KEY-----\n",
+        encoding="utf-8",
+    )
+    findings = Detector().scan_file(target).findings
+    names = {item.pattern_name for item in findings}
+    assert "GitHub Token" in names
+    assert "Private Key" in names
+    assert github not in " ".join(item.masked_value for item in findings)
+
+
+def test_public_key_header_is_not_a_finding(tmp_path: Path) -> None:
+    target = tmp_path / "pub.pem"
+    target.write_text("-----BEGIN PUBLIC KEY-----\n", encoding="utf-8")
+    assert Detector().scan_file(target).findings == ()
+
+
+def test_invalid_short_aws_key_is_not_a_finding(tmp_path: Path) -> None:
+    target = tmp_path / "config.py"
+    target.write_text("AWS_ACCESS_KEY_ID = 'AKIA123'\n", encoding="utf-8")
+    aws = [
+        item
+        for item in Detector().scan_file(target).findings
+        if item.pattern_name == "AWS Access Key ID"
+    ]
+    assert aws == []

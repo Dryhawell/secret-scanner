@@ -2,7 +2,9 @@
 
 from pathlib import Path
 
-from scanner.file_handler import ScanConfig, iter_scan_files, should_scan_file
+import pytest
+
+from scanner.file_handler import ScanConfig, iter_scan_files, looks_like_binary, should_scan_file
 
 
 def _names(paths: list[Path]) -> set[str]:
@@ -53,6 +55,8 @@ def test_skips_binary_extensions(tmp_path: Path) -> None:
     (tmp_path / "photo.PNG").write_bytes(b"not a real image")
     (tmp_path / "archive.zip").write_bytes(b"PK")
     (tmp_path / "notes.pdf").write_bytes(b"%PDF")
+    (tmp_path / "tool.exe").write_bytes(b"MZ")
+    (tmp_path / "lib.dll").write_bytes(b"MZ")
 
     found = list(iter_scan_files(tmp_path, ScanConfig()))
 
@@ -92,11 +96,8 @@ def test_excluded_extension_can_be_configured(tmp_path: Path) -> None:
 
 def test_missing_target_raises_file_not_found(tmp_path: Path) -> None:
     missing = tmp_path / "does-not-exist"
-    try:
+    with pytest.raises(FileNotFoundError):
         list(iter_scan_files(missing, ScanConfig()))
-    except FileNotFoundError:
-        return
-    raise AssertionError("expected FileNotFoundError")
 
 
 def test_skips_hidden_directories_but_still_scans_dotenv(tmp_path: Path) -> None:
@@ -119,4 +120,13 @@ def test_include_hidden_scans_dot_directories(tmp_path: Path) -> None:
     config = ScanConfig(include_hidden=True)
     found = list(iter_scan_files(tmp_path, config))
     assert _names(found) == {"app.py", "workflow.yml"}
+
+
+def test_looks_like_binary_detects_nul_bytes(tmp_path: Path) -> None:
+    binary = tmp_path / "blob.dat"
+    text = tmp_path / "ok.txt"
+    binary.write_bytes(b"hello\x00world")
+    text.write_text("plain\n", encoding="utf-8")
+    assert looks_like_binary(binary)
+    assert not looks_like_binary(text)
 

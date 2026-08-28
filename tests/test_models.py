@@ -31,3 +31,21 @@ def test_scan_result_findings_count() -> None:
         findings=(),
     )
     assert empty.findings_count == 0
+
+
+def test_finding_to_dict_has_no_plaintext_field(tmp_path: Path) -> None:
+    finding = SecretFinding(
+        file_path=tmp_path / "config.py",
+        line_number=3,
+        secret_type="AWS Access Key ID",
+        severity=Severity.CRITICAL,
+        masked_value="AKIA****************",
+        description="test",
+        pattern_name="AWS Access Key ID",
+        confidence=90,
+    )
+    payload = finding.to_dict(root=tmp_path)
+    assert "matched_text" not in payload
+    assert payload["masked_value"] == "AKIA****************"
+    assert payload["line_number"] == 3
+

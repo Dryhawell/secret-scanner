@@ -30,3 +30,18 @@ def test_scanner_uses_custom_config(tmp_path: Path) -> None:
     found = scanner.discover_files(tmp_path)
 
     assert [path.name for path in found] == ["app.py"]
+
+
+def test_scanner_skips_binary_and_reports_valid_secret(tmp_path: Path) -> None:
+    nested = tmp_path / "src"
+    nested.mkdir()
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    (nested / "config.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "photo.jpg").write_bytes(b"\xff\xd8\xff")
+    result = Scanner().scan(tmp_path)
+    assert result.files_scanned == 1
+    assert result.findings_count >= 1
+    assert aws not in result.findings[0].masked_value

@@ -45,6 +45,15 @@ def test_github_token_rejects_short_value() -> None:
     assert "GitHub Token" not in _match_names("ghp_SHORT")
 
 
+def test_github_fine_grained_token_matches_fake_format() -> None:
+    fake = "github_pat_" + ("C" * 22)
+    assert "GitHub Fine-Grained Token" in _match_names(fake)
+
+
+def test_github_fine_grained_token_rejects_short_value() -> None:
+    assert "GitHub Fine-Grained Token" not in _match_names("github_pat_short")
+
+
 def test_google_api_key_matches_fake_format() -> None:
     assert "Google API Key" in _match_names(FAKE_GOOGLE_KEY)
 
@@ -57,8 +66,8 @@ def test_jwt_matches_three_segments() -> None:
     assert "JWT" in _match_names(f"token = {FAKE_JWT}")
 
 
-def test_jwt_rejects_single_segment() -> None:
-    assert "JWT" not in _match_names("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9")
+def test_jwt_rejects_two_segments() -> None:
+    assert "JWT" not in _match_names("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0In0")
 
 
 def test_private_key_header_matches() -> None:
