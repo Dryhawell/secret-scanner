@@ -83,3 +83,16 @@ def test_severity_filter_can_hide_medium_findings(tmp_path: Path) -> None:
 
 def test_missing_target_exits_two(tmp_path: Path) -> None:
     assert run(["--no-color", str(tmp_path / "missing")]) == 2
+
+
+def test_cli_writes_json_to_output_file(tmp_path: Path) -> None:
+    import json
+
+    (tmp_path / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    report = tmp_path / "scan.json"
+    code = run(["--no-color", "--output", str(report), str(tmp_path)])
+    assert code == 0
+    data = json.loads(report.read_text(encoding="utf-8"))
+    assert data["files_scanned"] >= 1
+    assert data["findings_count"] == 0
+

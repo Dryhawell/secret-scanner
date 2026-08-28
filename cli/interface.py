@@ -1,14 +1,12 @@
 """Command-line interface for Secret Scanner.
 
-Text output is the product surface. ``--format json`` prints a JSON
-document to stdout (or ``--output``); timestamped files under reports/
-are the next phase.
+Text is the default surface. ``--format json`` writes a timestamped file
+under ``reports/`` unless ``--output`` is given (``-o -`` prints JSON to stdout).
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -21,6 +19,7 @@ from scanner.severity import (
     meets_minimum,
     sort_findings,
 )
+from utils.reporter import dumps_report, write_json_report
 
 _RESET = "\033[0m"
 _BOLD = "\033[1m"
@@ -40,6 +39,8 @@ examples:
   python main.py . --exclude dist --exclude build
   python main.py . --no-color
   python main.py . --format json
+  python main.py . --output reports/latest.json
+  python main.py . --format json -o -
 """
 
 
@@ -93,13 +94,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--format",
         choices=("text", "json"),
         default="text",
-        help="Output format (default: text)",
+        help="text (default) or json (writes reports/scan_*.json unless --output)",
     )
     parser.add_argument(
         "--output",
         "-o",
         metavar="FILE",
-        help="Write JSON to FILE instead of stdout",
+        help="Write JSON to FILE (use - for stdout). Without --output, "
+        "--format json writes reports/scan_YYYY-MM-DD_HHMM.json",
     )
     return parser
 
@@ -182,18 +184,24 @@ def emit_json(
     target: Path,
     findings: list[SecretFinding],
     output: str | None,
-) -> None:
-    payload = result.to_dict(root=target)
-    payload["findings"] = [item.to_dict(root=target) for item in findings]
-    payload["findings_count"] = len(findings)
-    text = json.dumps(payload, indent=2) + "\n"
-    if output:
-        Path(output).write_text(text, encoding="utf-8")
-    else:
-        sys.stdout.write(text)
+    reports_dir: Path | None = None,
+) -> Path | None:
+    """Write JSON to a file, or to stdout when output is '-'."""
+    if output == "-":
+        sys.stdout.write(dumps_report(result, findings, target))
+        return None
+    written = write_json_report(
+        result,
+        findings,
+        target,
+        output=Path(output) if output else None,
+        reports_dir=reports_dir or Path("reports"),
+    )
+    print(f"Report written: {written.as_posix()}")
+    return written
 
 
-def run(argv: list[str] | None = None) -> int:
+def run(argv: list[str] | None = None, *, reports_dir: Path | None = None) -> int:
     parser = build_parser()
     namespace = parser.parse_args(argv)
     target = resolve_target(namespace)
@@ -217,7 +225,7 @@ def run(argv: list[str] | None = None) -> int:
         format_name = "json"
 
     if format_name == "json":
-        emit_json(result, target, findings, namespace.output)
+        emit_json(result, target, findings, namespace.output, reports_dir=reports_dir)
     else:
         render_text(result, target, findings, color=color)
 
