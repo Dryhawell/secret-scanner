@@ -75,6 +75,22 @@ class SecretFinding:
                 pass
         return f"{path.as_posix()}:{self.line_number}"
 
+    def to_dict(self, root: Path | None = None) -> dict[str, object]:
+        """JSON-safe view. Never includes the plaintext secret."""
+        return {
+            "file_path": (
+                self.location(root).rsplit(":", 1)[0] if root is not None else self.file_path.as_posix()
+            ),
+            "line_number": self.line_number,
+            "secret_type": self.secret_type,
+            "severity": self.severity.value,
+            "confidence": self.confidence,
+            "masked_value": self.masked_value,
+            "description": self.description,
+            "pattern_name": self.pattern_name,
+            "timestamp": self.timestamp.isoformat(),
+        }
+
 
 @dataclass(frozen=True)
 class ScanResult:
@@ -96,3 +112,15 @@ class ScanResult:
     def scan_time(self) -> datetime:
         """Alias used later in JSON reports."""
         return self.started_at
+
+    def to_dict(self, root: Path | None = None) -> dict[str, object]:
+        """JSON-safe scan summary. Finding values stay masked."""
+        return {
+            "target": str(self.target),
+            "scan_time": self.scan_time.isoformat(),
+            "files_scanned": self.files_scanned,
+            "lines_scanned": self.lines_scanned,
+            "findings_count": self.findings_count,
+            "placeholders_ignored": self.placeholders_ignored,
+            "findings": [item.to_dict(root=root) for item in self.findings],
+        }

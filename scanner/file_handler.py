@@ -80,6 +80,7 @@ class ScanConfig:
     skip_symlinks: bool = True
     sniff_binary: bool = True
     binary_sniff_bytes: int = BINARY_SNIFF_BYTES
+    include_hidden: bool = False
 
     def __post_init__(self) -> None:
         """Normalize names so Windows and Linux behave the same."""
@@ -96,6 +97,18 @@ class ScanConfig:
 def is_excluded_directory(path: Path, config: ScanConfig) -> bool:
     """Return True if this directory name is on the exclude list."""
     return path.name.casefold() in config.excluded_dirs
+
+
+def _skip_hidden_directory(path: Path, config: ScanConfig) -> bool:
+    """Skip ``.github`` / ``.vscode`` unless ``--include-hidden`` is set.
+
+    Hidden *files* such as ``.env`` are still scanned; they are not directories.
+    ``.git`` and ``.venv`` remain excluded via ``excluded_dirs`` either way.
+    """
+    if config.include_hidden:
+        return False
+    name = path.name
+    return name.startswith(".") and name not in {".", ".."}
 
 
 def has_excluded_extension(path: Path, config: ScanConfig) -> bool:
@@ -180,6 +193,8 @@ def _walk_directory(directory: Path, config: ScanConfig) -> Iterator[Path]:
 
         if is_dir:
             if is_excluded_directory(child, config):
+                continue
+            if _skip_hidden_directory(child, config):
                 continue
             yield from _walk_directory(child, config)
         elif is_file:

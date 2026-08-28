@@ -97,3 +97,26 @@ def test_missing_target_raises_file_not_found(tmp_path: Path) -> None:
     except FileNotFoundError:
         return
     raise AssertionError("expected FileNotFoundError")
+
+
+def test_skips_hidden_directories_but_still_scans_dotenv(tmp_path: Path) -> None:
+    (tmp_path / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    (tmp_path / ".env").write_text("EXAMPLE=placeholder\n", encoding="utf-8")
+    hidden = tmp_path / ".github"
+    hidden.mkdir()
+    (hidden / "workflow.yml").write_text("name: ci\n", encoding="utf-8")
+
+    found = list(iter_scan_files(tmp_path, ScanConfig()))
+    assert _names(found) == {"app.py", ".env"}
+
+
+def test_include_hidden_scans_dot_directories(tmp_path: Path) -> None:
+    hidden = tmp_path / ".github"
+    hidden.mkdir()
+    (hidden / "workflow.yml").write_text("name: ci\n", encoding="utf-8")
+    (tmp_path / "app.py").write_text("print('ok')\n", encoding="utf-8")
+
+    config = ScanConfig(include_hidden=True)
+    found = list(iter_scan_files(tmp_path, config))
+    assert _names(found) == {"app.py", "workflow.yml"}
+
