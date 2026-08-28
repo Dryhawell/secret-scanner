@@ -42,6 +42,8 @@ PATTERN_SEVERITY: dict[str, Severity] = {
     "Database Connection String": Severity.HIGH,
     # MEDIUM: likely credentials, but often placeholders or local secrets.
     "Generic Password": Severity.MEDIUM,
+    # MEDIUM: variable name is sensitive, value has no known vendor format.
+    "Contextual Secret": Severity.MEDIUM,
 }
 
 

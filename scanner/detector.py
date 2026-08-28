@@ -1,8 +1,8 @@
 """Secret detection: apply compiled patterns to file contents.
 
-Reads files line by line, asks PatternEngine for hits, stores *masked*
-values only, and drops obvious placeholders. Context and confidence
-arrive in later phases.
+Reads files line by line, applies format patterns, then context analysis
+for sensitive assignments. Placeholder values are dropped. Confidence
+and entropy arrive in later phases.
 """
 
 from __future__ import annotations
@@ -10,9 +10,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from scanner.context import CONTEXTUAL_PATTERN_NAME, find_context_hits
 from scanner.filters import is_placeholder
 from scanner.models import SecretFinding
 from scanner.patterns import PatternEngine
+from scanner.severity import severity_for
 
 # Lines longer than this are skipped. A minified 5 MB line can freeze a regex
 # and would load a huge string into memory anyway.
@@ -31,6 +33,11 @@ def mask_secret(value: str, visible_prefix: int = 4) -> str:
     if len(value) <= visible_prefix * 2:
         return "*" * len(value)
     return value[:visible_prefix] + ("*" * (len(value) - visible_prefix))
+
+
+def _already_reported(value: str, kept: set[str]) -> bool:
+    """Skip context hits already covered by a format-specific pattern."""
+    return any(value == item or value in item or item in value for item in kept)
 
 
 @dataclass(frozen=True)
@@ -62,10 +69,14 @@ class Detector:
 
         findings: list[SecretFinding] = []
         ignored = 0
-        for match in self.engine.find_in_text(line):
+        pattern_matches = self.engine.find_in_text(line)
+        kept_values: set[str] = set()
+
+        for match in pattern_matches:
             if is_placeholder(match.matched_text):
                 ignored += 1
                 continue
+            kept_values.add(match.matched_text)
             findings.append(
                 SecretFinding(
                     file_path=file_path,
@@ -75,6 +86,28 @@ class Detector:
                     masked_value=mask_secret(match.matched_text),
                     description=match.description,
                     pattern_name=match.pattern_name,
+                )
+            )
+
+        for hit in find_context_hits(line):
+            if is_placeholder(hit.value):
+                ignored += 1
+                continue
+            if _already_reported(hit.value, kept_values):
+                continue
+            kept_values.add(hit.value)
+            findings.append(
+                SecretFinding(
+                    file_path=file_path,
+                    line_number=line_number,
+                    secret_type=CONTEXTUAL_PATTERN_NAME,
+                    severity=severity_for(CONTEXTUAL_PATTERN_NAME),
+                    masked_value=mask_secret(hit.value),
+                    description=(
+                        f"Sensitive assignment to {hit.identifier!r} "
+                        "without a known vendor-specific secret format."
+                    ),
+                    pattern_name=CONTEXTUAL_PATTERN_NAME,
                 )
             )
         return findings, ignored

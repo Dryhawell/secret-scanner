@@ -32,9 +32,10 @@ def _finding(name: str, line: int, severity: Severity) -> SecretFinding:
 def test_every_default_pattern_has_matching_policy() -> None:
     patterns = default_patterns()
     names = {pattern.name for pattern in patterns}
-    assert names == set(PATTERN_SEVERITY)
+    assert names <= set(PATTERN_SEVERITY)
     for pattern in patterns:
         assert pattern.severity is severity_for(pattern.name)
+    assert "Contextual Secret" in PATTERN_SEVERITY
 
 
 def test_cloud_and_private_key_are_critical() -> None:
