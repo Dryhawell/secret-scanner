@@ -4,8 +4,8 @@ from scanner.confidence import (
     MAX_CONFIDENCE,
     MIN_CONFIDENCE,
     calculate_confidence,
-    variety_ratio,
 )
+from scanner.entropy import shannon_entropy
 
 
 def test_confidence_never_claims_certainty() -> None:
@@ -42,13 +42,13 @@ def test_sensitive_name_on_line_raises_confidence() -> None:
     assert named > bare
 
 
-def test_low_variety_lowers_score() -> None:
+def test_low_entropy_lowers_generic_score() -> None:
     repeated = "A" * 24
     mixed = "LocalDevTokenValue1"
     low = calculate_confidence("Contextual Secret", repeated, 'token = "%s"' % repeated)
     high = calculate_confidence("Contextual Secret", mixed, 'token = "%s"' % mixed)
     assert low < high
-    assert variety_ratio(repeated) < 0.25
+    assert shannon_entropy(repeated) == 0.0
 
 
 def test_detector_sets_confidence(tmp_path) -> None:

@@ -4,11 +4,11 @@ Confidence is *not* a verdict that a credential is valid, live, or
 exploitable. It only answers: "how much does this look like a secret
 to the detector?"
 
-Factors used now:
+Factors:
     * pattern strength (vendor format vs generic assignment)
     * context (sensitive variable name on the same line)
-    * character variety (a stand-in until Shannon entropy in the next phase)
-    * leftover dummy-looking traits that the placeholder filter did not drop
+    * Shannon entropy (randomness of the value)
+    * length for generic types
 
 The score is clamped to 5–99. 100% would be dishonest; 0% would hide a hit.
 """
@@ -18,6 +18,7 @@ from __future__ import annotations
 import re
 
 from scanner.context import CONTEXTUAL_PATTERN_NAME, is_sensitive_identifier
+from scanner.entropy import entropy_adjustment
 
 MIN_CONFIDENCE = 5
 MAX_CONFIDENCE = 99
@@ -40,13 +41,6 @@ PATTERN_BASE: dict[str, int] = {
 _ASSIGNED_NAME = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*[:=]")
 
 
-def variety_ratio(value: str) -> float:
-    """Unique characters / length. Not Shannon entropy."""
-    if not value:
-        return 0.0
-    return len(set(value)) / len(value)
-
-
 def line_has_sensitive_name(line: str) -> bool:
     """True if an identifier before ``=`` or ``:`` looks credential-related."""
     for match in _ASSIGNED_NAME.finditer(line):
@@ -62,13 +56,7 @@ def calculate_confidence(pattern_name: str, value: str, line: str = "") -> int:
     if pattern_name != CONTEXTUAL_PATTERN_NAME and line_has_sensitive_name(line):
         score += 8
 
-    variety = variety_ratio(value)
-    if variety < 0.25:
-        score -= 22
-    elif variety < 0.40:
-        score -= 10
-    elif variety >= 0.70 and len(value) >= 16:
-        score += 4
+    score += entropy_adjustment(pattern_name, value)
 
     if pattern_name in {"Generic Password", "Generic API Key", "Contextual Secret"}:
         if len(value) < 12:

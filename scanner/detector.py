@@ -1,8 +1,9 @@
 """Secret detection: apply compiled patterns to file contents.
 
 Reads files line by line, applies format patterns, then context analysis
-for sensitive assignments. Placeholder values are dropped. Confidence is a detection score, not a
-verdict. Shannon entropy arrives in a later phase.
+for sensitive assignments. Placeholder values and low-entropy generic
+strings are dropped. Confidence is a detection score, not a verdict.
+Shannon entropy supports scoring; it is never used as a standalone detector.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from pathlib import Path
 
 from scanner.confidence import calculate_confidence
 from scanner.context import CONTEXTUAL_PATTERN_NAME, find_context_hits
+from scanner.entropy import ENTROPY_GATED_PATTERNS, is_low_entropy
 from scanner.filters import is_placeholder
 from scanner.models import SecretFinding
 from scanner.patterns import PatternEngine
@@ -77,6 +79,12 @@ class Detector:
             if is_placeholder(match.matched_text):
                 ignored += 1
                 continue
+            if (
+                match.pattern_name in ENTROPY_GATED_PATTERNS
+                and is_low_entropy(match.matched_text)
+            ):
+                ignored += 1
+                continue
             kept_values.add(match.matched_text)
             findings.append(
                 SecretFinding(
@@ -95,6 +103,9 @@ class Detector:
 
         for hit in find_context_hits(line):
             if is_placeholder(hit.value):
+                ignored += 1
+                continue
+            if is_low_entropy(hit.value):
                 ignored += 1
                 continue
             if _already_reported(hit.value, kept_values):
