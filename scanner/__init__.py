@@ -14,6 +14,7 @@ from scanner.models import PatternMatch, ScanResult, SecretFinding, SecretPatter
 from scanner.patterns import PatternEngine
 from scanner.scanner import Scanner
 from scanner.severity import meets_minimum, severity_for
+from scanner.version import __version__
 
 __all__ = [
     "CONTEXTUAL_PATTERN_NAME",
@@ -32,6 +33,7 @@ __all__ = [
     "SecretFinding",
     "SecretPattern",
     "Severity",
+    "__version__",
     "mask_secret",
     "meets_minimum",
     "severity_for",

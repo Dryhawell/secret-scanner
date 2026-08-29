@@ -12,6 +12,13 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
+**v1.0.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+
+```text
+python main.py --version
+# Secret Scanner 1.0.0
+```
+
 ## Why Secret Scanner?
 
 Credentials in Git are a common incident: one `git push` can leak an AWS key,
@@ -124,6 +131,7 @@ python main.py [path] [options]
 | `--output FILE` / `-o -` | Write JSON to a file, or stdout |
 | `--no-color` | Disable ANSI colors |
 | `--verbose` | DEBUG per-file lines in the log file |
+| `--version` | Print `Secret Scanner 1.0.0` and exit |
 
 `--staged` and `--changed` are mutually exclusive. They require a Git repository
 and the `git` executable. After a clean CI checkout, both lists are empty —
@@ -142,6 +150,7 @@ python main.py . --format json
 python main.py . --output reports/latest.json
 python main.py . --format json -o -
 python main.py . --verbose --no-color
+python main.py --version
 ```
 
 Example terminal output (values are **masked**; this is a fake AWS key ID):
@@ -316,6 +325,10 @@ Possible later work (not in the current tree):
 Scan only repositories and directories you own or have **explicit permission**
 to audit. Do not use this tool to search for credentials in systems you are not
 authorized to access.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the v1.0.0 release notes.
 
 ## License
 

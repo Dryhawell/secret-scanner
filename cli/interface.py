@@ -20,6 +20,7 @@ from scanner.severity import (
     meets_minimum,
     sort_findings,
 )
+from scanner.version import __version__
 from utils.logger import get_logger, setup_logging
 from utils.reporter import dumps_report, write_json_report
 
@@ -46,6 +47,7 @@ examples:
   python main.py . --verbose
   python main.py . --staged
   python main.py . --changed
+  python main.py --version
 """
 
 
@@ -59,6 +61,11 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         epilog=_EXAMPLES,
         formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"Secret Scanner {__version__}",
     )
     parser.add_argument(
         "path",
