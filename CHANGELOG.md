@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.0 — 2026-08-29
+
+### Added
+
+- `.secret-scanner-ignore` path skips and `path | Pattern Name` finding rules
+- `--ignore-file` (exit 2 if the explicit file is missing)
+- `allowlist_ignored` in scan results and JSON reports
+
+### Changed
+
+- CI product scan uses the ignore file instead of `--exclude tests --severity HIGH`
+
 ## 1.0.0 — 2026-08-29
 
 First stable release. Defensive secret scanner for local trees and CI.

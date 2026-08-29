@@ -12,6 +12,7 @@ from pathlib import Path
 
 from scanner.file_handler import ScanConfig
 from scanner.git_mode import GitError, list_changed_files, list_staged_files, repo_root, restrict_to_target
+from scanner.ignore import IgnoreError, default_ignore_file, load_ignore_file
 from scanner.models import ScanResult, SecretFinding, Severity
 from scanner.scanner import Scanner
 from scanner.severity import (
@@ -48,6 +49,7 @@ examples:
   python main.py . --staged
   python main.py . --changed
   python main.py --version
+  python main.py . --ignore-file .secret-scanner-ignore
 """
 
 
@@ -132,6 +134,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Scan files changed vs HEAD plus untracked files",
     )
+    parser.add_argument(
+        "--ignore-file",
+        metavar="FILE",
+        help="Allowlist file (default: .secret-scanner-ignore next to the "
+        "target or in the current directory, if present)",
+    )
     return parser
 
 
@@ -145,6 +153,24 @@ def build_scan_config(namespace: argparse.Namespace) -> ScanConfig:
     for name in namespace.exclude:
         config.exclude_dir(name)
     return config
+
+
+def apply_ignore_file(
+    config: ScanConfig, namespace: argparse.Namespace, target: Path
+) -> None:
+    """Load allowlist rules into ``config``. Missing default file is a no-op."""
+    if namespace.ignore_file:
+        path = Path(namespace.ignore_file)
+        if not path.is_file():
+            raise IgnoreError(f"Ignore file does not exist: {path}")
+    else:
+        found = default_ignore_file(target)
+        if found is None:
+            return
+        path = found
+    rules = load_ignore_file(path)
+    config.ignore_paths.extend(rules.paths)
+    config.ignore_findings.extend(rules.findings)
 
 
 def _use_color(no_color: bool) -> bool:
@@ -182,6 +208,7 @@ def render_text(
     print(f"Lines scanned: {result.lines_scanned:,}")
     print(f"Potential secrets found: {len(findings)}")
     print(f"Placeholders ignored: {result.placeholders_ignored}")
+    print(f"Allowlist ignored: {result.allowlist_ignored}")
     print(
         f"By severity: {format_severity_counts(count_by_severity(findings))}"
     )
@@ -250,6 +277,7 @@ def run(
 
     scanner = Scanner(config=build_scan_config(namespace))
     try:
+        apply_ignore_file(scanner.config, namespace, target)
         if namespace.staged or namespace.changed:
             root = repo_root(target)
             git_files = (
@@ -266,6 +294,10 @@ def run(
         print(f"Error: {exc}", file=sys.stderr)
         return 2
     except GitError as exc:
+        get_logger().error("%s", exc)
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+    except IgnoreError as exc:
         get_logger().error("%s", exc)
         print(f"Error: {exc}", file=sys.stderr)
         return 2

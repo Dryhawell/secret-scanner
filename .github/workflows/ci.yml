@@ -1,5 +1,6 @@
-# Run tests on every push/PR, and fail if HIGH+ secrets appear in product code.
-# Test fixtures contain fake keys on purpose — they are excluded until allowlist exists.
+# Run tests on every push/PR, and fail if secrets appear in product code.
+# Test fixtures and known detector.py contextual FPs are listed in
+# .secret-scanner-ignore — not hidden with --severity.
 # Terminal output is masked; plaintext secret values are never printed or logged.
 
 name: CI
@@ -62,12 +63,8 @@ jobs:
 
       - name: Scan for leaked secrets
         # Stdlib only — pytest is not required to run the scanner.
-        # --exclude tests: fixtures use fake AWS/PEM values so the suite can assert detection.
-        # --severity HIGH: ignore MEDIUM contextual hits in detector.py until allowlist exists.
-        # After checkout the tree is clean, so --staged / --changed would scan nothing.
+        # Allowlist: .secret-scanner-ignore. Checkout is clean, so --staged is empty.
         run: >
           python main.py .
           --no-color
           --include-hidden
-          --exclude tests
-          --severity HIGH

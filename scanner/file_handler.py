@@ -90,6 +90,8 @@ class ScanConfig:
     binary_sniff_bytes: int = BINARY_SNIFF_BYTES
     include_hidden: bool = False
     max_file_size_bytes: int | None = DEFAULT_MAX_FILE_SIZE
+    ignore_paths: list[str] = field(default_factory=list)
+    ignore_findings: list[tuple[str, str]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Normalize names so Windows and Linux behave the same."""

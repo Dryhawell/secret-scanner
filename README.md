@@ -12,11 +12,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.0.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.1.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.0.0
+# Secret Scanner 1.1.0
 ```
 
 ## Why Secret Scanner?
@@ -38,8 +38,9 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Severity (CRITICAL → LOW) and confidence (5–99)
 - Masked terminal output and JSON reports
 - `--staged` / `--changed` Git modes
-- Exit codes for CI (`0` clean, `1` findings, `2` error)
+- Path / finding allowlist (`.secret-scanner-ignore`)
 - File logging without secret values
+- Exit codes for CI (`0` clean, `1` findings, `2` error)
 
 ## Detection Engine
 
@@ -131,7 +132,8 @@ python main.py [path] [options]
 | `--output FILE` / `-o -` | Write JSON to a file, or stdout |
 | `--no-color` | Disable ANSI colors |
 | `--verbose` | DEBUG per-file lines in the log file |
-| `--version` | Print `Secret Scanner 1.0.0` and exit |
+| `--ignore-file FILE` | Allowlist (default: `.secret-scanner-ignore` if present) |
+| `--version` | Print the version and exit |
 
 `--staged` and `--changed` are mutually exclusive. They require a Git repository
 and the `git` executable. After a clean CI checkout, both lists are empty —
@@ -151,7 +153,28 @@ python main.py . --output reports/latest.json
 python main.py . --format json -o -
 python main.py . --verbose --no-color
 python main.py --version
+python main.py . --ignore-file .secret-scanner-ignore
 ```
+
+## Ignore rules
+
+`.secret-scanner-ignore` skips **reporting**. It is not `.gitignore`. Use it
+for fixtures and known false positives, not live credentials.
+
+```text
+# Skip a directory tree (test fixtures with fake keys).
+tests/
+
+# Still scan the file; drop only this finding type.
+scanner/detector.py | Contextual Secret
+```
+
+`path | Pattern Name` does not hide other types on that file. An AWS key in
+`scanner/detector.py` is still reported.
+
+`--ignore-file` must exist when given (exit `2` if missing). Without the flag,
+the scanner loads `.secret-scanner-ignore` next to the target, or from the
+current directory when that directory is a parent of the target.
 
 Example terminal output (values are **masked**; this is a fake AWS key ID):
 
@@ -164,6 +187,7 @@ Files scanned: 12
 Lines scanned: 840
 Potential secrets found: 2
 Placeholders ignored: 1
+Allowlist ignored: 0
 By severity: CRITICAL=1  HIGH=1  MEDIUM=0  LOW=0
 
 CRITICAL
@@ -203,7 +227,7 @@ findings. Payload shape (no plaintext `value` field):
     {
       "file_path": "config.py",
       "line_number": 17,
-      "secret_type": "AWS Access Key ID",
+      "secret_type": "AwsAccessKeyId",
       "severity": "CRITICAL",
       "confidence": 98,
       "masked_value": "AKIA****************",
@@ -236,9 +260,9 @@ GitHub Actions workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 This repository’s pipeline:
 
 1. Runs `pytest` on Python 3.11 and 3.12.
-2. Scans **product code** (`--exclude tests --severity HIGH --include-hidden`).
-   Test fixtures contain synthetic AWS/PEM values on purpose; an allowlist is
-   not implemented yet.
+2. Scans the tree (`--include-hidden`) using [`.secret-scanner-ignore`](.secret-scanner-ignore)
+   so test fixtures and a known contextual false positive are skipped. A real
+   vendor-format key in product code still fails the job.
 
 Exit codes (the language of CI):
 
@@ -278,8 +302,10 @@ mode, and the CI workflow file. All credentials in tests are fakes.
   negatives by design, for performance).
 - `--staged` does not scan untracked files; `--changed` does not equal
   “the whole repository”.
-- No allowlist, baseline, YAML config, SARIF, HTML report, or pre-commit
-  hook installer in this version.
+- Allowlist is path/finding-name based, not a hashed secret baseline. An
+  ignored path will not report a newly added live key.
+- No YAML config, SARIF, HTML report, or pre-commit hook installer in this
+  version.
 - Detection is never 100% accurate.
 
 ## Architecture
@@ -298,6 +324,7 @@ scanner/
   severity.py           pattern → CRITICAL/HIGH/MEDIUM/LOW
   models.py             SecretFinding, ScanResult
   git_mode.py           staged / changed file lists
+  ignore.py             path / finding allowlist
   scanner.py            orchestration
 utils/logger.py         file logs, no secret values
 utils/reporter.py       masked JSON
@@ -314,7 +341,7 @@ Possible later work (not in the current tree):
 
 - Git pre-commit hook installer
 - YAML configuration and custom regexes
-- Allowlist / baseline / ignore rules
+- Hashed secret baseline
 - SARIF and HTML reports
 - Git history scanning
 - Parallel scanning

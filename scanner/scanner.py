@@ -8,6 +8,7 @@ from pathlib import Path
 
 from scanner.detector import Detector
 from scanner.file_handler import ScanConfig, iter_scan_files, should_scan_file
+from scanner.ignore import ignore_root, is_ignored_finding, is_ignored_path
 from scanner.models import ScanResult, SecretFinding
 from scanner.patterns import PatternEngine
 from utils.logger import get_logger
@@ -34,6 +35,9 @@ class Scanner:
         for path in iter_scan_files(target, self.config):
             if path in seen:
                 continue
+            if is_ignored_path(path, ignore_root(Path(target)), self.config.ignore_paths):
+                _LOG.debug("Allowlist skipped file %s", path)
+                continue
             seen.add(path)
             unique.append(path)
         return unique
@@ -49,6 +53,9 @@ class Scanner:
             if resolved in seen:
                 continue
             if not should_scan_file(resolved, self.config):
+                continue
+            if is_ignored_path(resolved, ignore_root(target), self.config.ignore_paths):
+                _LOG.debug("Allowlist skipped file %s", resolved)
                 continue
             seen.add(resolved)
             unique.append(resolved)
@@ -78,21 +85,38 @@ class Scanner:
         findings: list[SecretFinding] = []
         lines_scanned = 0
         placeholders_ignored = 0
+        allowlist_ignored = 0
         for path in files:
             _LOG.debug("Scanning file %s", path)
             file_scan = self.detector.scan_file(path)
-            findings.extend(file_scan.findings)
             lines_scanned += file_scan.lines_scanned
             placeholders_ignored += file_scan.placeholders_ignored
+            for finding in file_scan.findings:
+                if is_ignored_finding(
+                    finding.file_path,
+                    finding.pattern_name,
+                    ignore_root(target),
+                    self.config.ignore_findings,
+                ):
+                    allowlist_ignored += 1
+                    _LOG.debug(
+                        "Allowlist dropped %s at %s:%s",
+                        finding.pattern_name,
+                        path.name,
+                        finding.line_number,
+                    )
+                    continue
+                findings.append(finding)
         resolved = target.expanduser()
         resolved = resolved.resolve() if resolved.exists() else resolved
         finished_at = datetime.now(timezone.utc)
         _LOG.info(
-            "Scan completed: files=%s lines=%s findings=%s ignored=%s",
+            "Scan completed: files=%s lines=%s findings=%s ignored=%s allowlist=%s",
             len(files),
             lines_scanned,
             len(findings),
             placeholders_ignored,
+            allowlist_ignored,
         )
         return ScanResult(
             target=resolved,
@@ -102,4 +126,5 @@ class Scanner:
             lines_scanned=lines_scanned,
             findings=tuple(findings),
             placeholders_ignored=placeholders_ignored,
+            allowlist_ignored=allowlist_ignored,
         )

@@ -103,6 +103,7 @@ class ScanResult:
     lines_scanned: int
     findings: tuple[SecretFinding, ...]
     placeholders_ignored: int = 0
+    allowlist_ignored: int = 0
 
     @property
     def findings_count(self) -> int:
@@ -122,5 +123,6 @@ class ScanResult:
             "lines_scanned": self.lines_scanned,
             "findings_count": self.findings_count,
             "placeholders_ignored": self.placeholders_ignored,
+            "allowlist_ignored": self.allowlist_ignored,
             "findings": [item.to_dict(root=root) for item in self.findings],
         }

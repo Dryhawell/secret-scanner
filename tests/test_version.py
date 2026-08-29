@@ -1,7 +1,7 @@
-"""Version constant for the v1.0.0 release."""
+"""Version constant."""
 
 from scanner.version import __version__
 
 
-def test_version_is_semver_v1() -> None:
-    assert __version__ == "1.0.0"
+def test_version_is_semver() -> None:
+    assert __version__ == "1.1.0"
