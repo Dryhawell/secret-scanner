@@ -24,7 +24,7 @@ def test_scanner_uses_custom_config(tmp_path: Path) -> None:
     (extra / "lib.py").write_text("ignored\n", encoding="utf-8")
 
     config = ScanConfig()
-    config.excluded_dirs.add("vendor")
+    config.exclude_dir("vendor")
     scanner = Scanner(config=config)
 
     found = scanner.discover_files(tmp_path)

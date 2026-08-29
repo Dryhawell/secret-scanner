@@ -39,6 +39,13 @@ def test_exclude_is_added_to_scan_config() -> None:
     assert "build" in config.excluded_dirs
 
 
+def test_exclude_is_casefolded() -> None:
+    namespace = build_parser().parse_args([".", "--exclude", "Dist"])
+    config = build_scan_config(namespace)
+    assert "dist" in config.excluded_dirs
+    assert "Dist" not in config.excluded_dirs
+
+
 def test_filter_findings_keeps_minimum_severity() -> None:
     critical = SecretFinding(
         file_path=Path("a.py"),
@@ -91,6 +98,10 @@ def test_missing_target_exits_two(tmp_path: Path) -> None:
     assert run(["--no-color", str(tmp_path / "missing")]) == 2
 
 
+def test_staged_missing_target_exits_two_without_calling_git(tmp_path: Path) -> None:
+    assert run(["--no-color", "--staged", str(tmp_path / "missing")]) == 2
+
+
 def test_cli_writes_json_to_output_file(tmp_path: Path) -> None:
     import json
 
@@ -101,4 +112,11 @@ def test_cli_writes_json_to_output_file(tmp_path: Path) -> None:
     data = json.loads(report.read_text(encoding="utf-8"))
     assert data["files_scanned"] >= 1
     assert data["findings_count"] == 0
+
+
+def test_output_write_failure_exits_two(tmp_path: Path) -> None:
+    (tmp_path / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    blocker = tmp_path / "not_a_dir"
+    blocker.write_text("x\n", encoding="utf-8")
+    assert run(["--no-color", "--output", str(blocker / "scan.json"), str(tmp_path)]) == 2
 

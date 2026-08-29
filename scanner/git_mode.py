@@ -15,6 +15,7 @@ from utils.logger import get_logger
 _LOG = get_logger()
 
 _DIFF_FILTER = "ACMR"
+_GIT_TIMEOUT_SECONDS = 30
 
 
 class GitError(Exception):
@@ -31,11 +32,14 @@ def _run_git(root: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
             encoding="utf-8",
             errors="replace",
             check=False,
+            timeout=_GIT_TIMEOUT_SECONDS,
         )
     except FileNotFoundError as exc:
         raise GitError(
             "git executable not found. Install Git and ensure it is on PATH."
         ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise GitError("git command timed out.") from exc
 
 
 def repo_root(start: Path) -> Path:

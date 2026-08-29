@@ -75,7 +75,7 @@ class ScanConfig:
     Change these on an instance rather than editing module constants::
 
         config = ScanConfig()
-        config.excluded_dirs.add("dist")
+        config.exclude_dir("dist")
         config.excluded_extensions.add(".bin")
     """
 
@@ -101,6 +101,10 @@ class ScanConfig:
                 ext = f".{ext}"
             normalized_exts.add(ext)
         self.excluded_extensions = normalized_exts
+
+    def exclude_dir(self, name: str) -> None:
+        """Skip directories named ``name`` (compared case-insensitively)."""
+        self.excluded_dirs.add(name.casefold())
 
 
 def is_excluded_directory(path: Path, config: ScanConfig) -> bool:

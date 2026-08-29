@@ -81,6 +81,19 @@ def test_single_file_target(tmp_path: Path) -> None:
     assert found == [target.resolve()]
 
 
+def test_exclude_dir_is_case_insensitive(tmp_path: Path) -> None:
+    (tmp_path / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    vendor = tmp_path / "Vendor"
+    vendor.mkdir()
+    (vendor / "lib.py").write_text("ignored\n", encoding="utf-8")
+
+    config = ScanConfig()
+    config.exclude_dir("VENDOR")
+    found = list(iter_scan_files(tmp_path, config))
+
+    assert _names(found) == {"app.py"}
+
+
 def test_excluded_extension_can_be_configured(tmp_path: Path) -> None:
     (tmp_path / "keep.py").write_text("print('ok')\n", encoding="utf-8")
     (tmp_path / "skip.md").write_text("# notes\n", encoding="utf-8")

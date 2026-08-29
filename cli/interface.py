@@ -136,7 +136,7 @@ def resolve_target(namespace: argparse.Namespace) -> Path:
 def build_scan_config(namespace: argparse.Namespace) -> ScanConfig:
     config = ScanConfig(include_hidden=namespace.include_hidden)
     for name in namespace.exclude:
-        config.excluded_dirs.add(name)
+        config.exclude_dir(name)
     return config
 
 
@@ -236,6 +236,11 @@ def run(
     color = _use_color(namespace.no_color)
     setup_logging(log_file=log_file, verbose=namespace.verbose)
 
+    if not target.exists():
+        get_logger().error("Target does not exist: %s", target)
+        print(f"Error: Target does not exist: {target}", file=sys.stderr)
+        return 2
+
     scanner = Scanner(config=build_scan_config(namespace))
     try:
         if namespace.staged or namespace.changed:
@@ -267,10 +272,15 @@ def run(
     if namespace.output:
         format_name = "json"
 
-    if format_name == "json":
-        emit_json(result, target, findings, namespace.output, reports_dir=reports_dir)
-    else:
-        render_text(result, target, findings, color=color)
+    try:
+        if format_name == "json":
+            emit_json(result, target, findings, namespace.output, reports_dir=reports_dir)
+        else:
+            render_text(result, target, findings, color=color)
+    except OSError as exc:
+        get_logger().error("Unable to write output: %s", exc)
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
 
     if findings:
         return 1
