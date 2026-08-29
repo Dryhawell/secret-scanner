@@ -27,8 +27,15 @@ class Scanner:
         self.detector = Detector(engine=self.engine)
 
     def discover_files(self, target: str | Path) -> list[Path]:
-        """Return scan-candidate files under ``target``."""
-        return list(iter_scan_files(target, self.config))
+        """Return unique scan-candidate files under ``target``."""
+        seen: set[Path] = set()
+        unique: list[Path] = []
+        for path in iter_scan_files(target, self.config):
+            if path in seen:
+                continue
+            seen.add(path)
+            unique.append(path)
+        return unique
 
     def scan(self, target: str | Path) -> ScanResult:
         """Discover files, detect secrets, return a structured result.

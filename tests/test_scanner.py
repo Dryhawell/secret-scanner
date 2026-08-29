@@ -45,3 +45,12 @@ def test_scanner_skips_binary_and_reports_valid_secret(tmp_path: Path) -> None:
     assert result.files_scanned == 1
     assert result.findings_count >= 1
     assert aws not in result.findings[0].masked_value
+
+
+def test_discover_files_deduplicates_resolved_paths(tmp_path: Path) -> None:
+    target = tmp_path / "app.py"
+    target.write_text("print('ok')\n", encoding="utf-8")
+    scanner = Scanner()
+    found = scanner.discover_files(tmp_path)
+    assert found.count(target.resolve()) == 1
+

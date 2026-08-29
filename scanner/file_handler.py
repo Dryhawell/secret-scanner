@@ -1,7 +1,7 @@
 """File selection helpers for directory scanning.
 
 This module decides *which* paths are scan candidates. It does not look
-for secrets. Secret detection is a later phase.
+for secrets. Size and binary checks keep large dumps out of the regex loop.
 
 Why this split exists:
     Walking the filesystem and matching regexes are different jobs. File
@@ -63,6 +63,10 @@ DEFAULT_EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
 # How many leading bytes we read to sniff for NUL characters.
 BINARY_SNIFF_BYTES = 8192
 
+# Skip files larger than this. A 500 MB .log or misnamed dump would freeze
+# line-by-line regex. Source trees rarely need more than a few megabytes.
+DEFAULT_MAX_FILE_SIZE = 5 * 1024 * 1024
+
 
 @dataclass
 class ScanConfig:
@@ -85,6 +89,7 @@ class ScanConfig:
     sniff_binary: bool = True
     binary_sniff_bytes: int = BINARY_SNIFF_BYTES
     include_hidden: bool = False
+    max_file_size_bytes: int | None = DEFAULT_MAX_FILE_SIZE
 
     def __post_init__(self) -> None:
         """Normalize names so Windows and Linux behave the same."""
@@ -136,13 +141,32 @@ def looks_like_binary(path: Path, sniff_bytes: int = BINARY_SNIFF_BYTES) -> bool
     return b"\x00" in chunk
 
 
+def is_oversized_file(path: Path, config: ScanConfig) -> bool:
+    """Return True if the file exceeds ``max_file_size_bytes`` (when set)."""
+    limit = config.max_file_size_bytes
+    if limit is None:
+        return False
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return True
+    return size > limit
+
+
 def should_scan_file(path: Path, config: ScanConfig) -> bool:
-    """Return True if this file should be a scan candidate."""
+    """Return True if this file should be a scan candidate.
+
+    Cheap checks run first (symlink, extension, size) so we do not open a
+    multi-gigabyte dump just to sniff the first 8 KB.
+    """
     if config.skip_symlinks and path.is_symlink():
         return False
     if not path.is_file():
         return False
     if has_excluded_extension(path, config):
+        return False
+    if is_oversized_file(path, config):
+        _LOG.debug("Skipping oversized file %s", path)
         return False
     if config.sniff_binary and looks_like_binary(path, config.binary_sniff_bytes):
         return False

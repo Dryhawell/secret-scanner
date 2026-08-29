@@ -130,3 +130,25 @@ def test_looks_like_binary_detects_nul_bytes(tmp_path: Path) -> None:
     assert looks_like_binary(binary)
     assert not looks_like_binary(text)
 
+
+def test_skips_oversized_text_files(tmp_path: Path) -> None:
+    small = tmp_path / "ok.py"
+    huge = tmp_path / "dump.txt"
+    small.write_text("print('ok')\n", encoding="utf-8")
+    huge.write_bytes(b"A" * 200)
+
+    config = ScanConfig(max_file_size_bytes=50)
+    found = list(iter_scan_files(tmp_path, config))
+
+    assert _names(found) == {"ok.py"}
+    assert not should_scan_file(huge, config)
+    assert should_scan_file(small, config)
+
+
+def test_unlimited_size_when_max_file_size_is_none(tmp_path: Path) -> None:
+    huge = tmp_path / "dump.txt"
+    huge.write_bytes(b"A" * 200)
+    config = ScanConfig(max_file_size_bytes=None)
+    assert should_scan_file(huge, config)
+
+
