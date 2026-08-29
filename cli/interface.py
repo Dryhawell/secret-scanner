@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 from scanner.file_handler import ScanConfig
+from scanner.git_mode import GitError, list_changed_files, list_staged_files, repo_root, restrict_to_target
 from scanner.models import ScanResult, SecretFinding, Severity
 from scanner.scanner import Scanner
 from scanner.severity import (
@@ -43,6 +44,8 @@ examples:
   python main.py . --output reports/latest.json
   python main.py . --format json -o -
   python main.py . --verbose
+  python main.py . --staged
+  python main.py . --changed
 """
 
 
@@ -110,6 +113,17 @@ def build_parser() -> argparse.ArgumentParser:
         "-v",
         action="store_true",
         help="Write DEBUG logs (per-file) to the log file",
+    )
+    git_group = parser.add_mutually_exclusive_group()
+    git_group.add_argument(
+        "--staged",
+        action="store_true",
+        help="Scan only files staged for commit (git diff --cached)",
+    )
+    git_group.add_argument(
+        "--changed",
+        action="store_true",
+        help="Scan files changed vs HEAD plus untracked files",
     )
     return parser
 
@@ -224,9 +238,23 @@ def run(
 
     scanner = Scanner(config=build_scan_config(namespace))
     try:
-        result = scanner.scan(target)
+        if namespace.staged or namespace.changed:
+            root = repo_root(target)
+            git_files = (
+                list_staged_files(root)
+                if namespace.staged
+                else list_changed_files(root)
+            )
+            scoped = restrict_to_target(git_files, target.resolve())
+            result = scanner.scan_paths(scoped, target=target)
+        else:
+            result = scanner.scan(target)
     except FileNotFoundError as exc:
         get_logger().error("Target does not exist: %s", target)
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+    except GitError as exc:
+        get_logger().error("%s", exc)
         print(f"Error: {exc}", file=sys.stderr)
         return 2
 

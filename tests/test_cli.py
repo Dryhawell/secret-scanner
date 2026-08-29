@@ -21,6 +21,12 @@ def test_help_exits_zero() -> None:
     assert caught.value.code == 0
 
 
+def test_staged_and_changed_are_exclusive() -> None:
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args([".", "--staged", "--changed"])
+
+
 def test_resolve_target_prefers_path_option() -> None:
     namespace = build_parser().parse_args(["./src", "--path", "./other"])
     assert resolve_target(namespace) == Path("./other")

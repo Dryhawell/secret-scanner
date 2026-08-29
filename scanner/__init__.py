@@ -9,6 +9,7 @@ from scanner.detector import Detector, FileScan, mask_secret
 from scanner.entropy import shannon_entropy
 from scanner.filters import is_placeholder
 from scanner.file_handler import ScanConfig
+from scanner.git_mode import GitError
 from scanner.models import PatternMatch, ScanResult, SecretFinding, SecretPattern, Severity
 from scanner.patterns import PatternEngine
 from scanner.scanner import Scanner
@@ -19,6 +20,7 @@ __all__ = [
     "calculate_confidence",
     "Detector",
     "FileScan",
+    "GitError",
     "is_placeholder",
     "is_sensitive_identifier",
     "shannon_entropy",

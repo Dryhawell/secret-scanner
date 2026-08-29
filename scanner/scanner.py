@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 
 from scanner.detector import Detector
-from scanner.file_handler import ScanConfig, iter_scan_files
+from scanner.file_handler import ScanConfig, iter_scan_files, should_scan_file
 from scanner.models import ScanResult, SecretFinding
 from scanner.patterns import PatternEngine
 from utils.logger import get_logger
@@ -37,6 +38,23 @@ class Scanner:
             unique.append(path)
         return unique
 
+    def scan_paths(self, paths: Sequence[Path], *, target: Path) -> ScanResult:
+        """Scan an explicit file list (Git staged/changed). Discovery is skipped."""
+        started_at = datetime.now(timezone.utc)
+        _LOG.info("Scan started (explicit paths): %s", target)
+        unique: list[Path] = []
+        seen: set[Path] = set()
+        for path in paths:
+            resolved = path.expanduser().resolve()
+            if resolved in seen:
+                continue
+            if not should_scan_file(resolved, self.config):
+                continue
+            seen.add(resolved)
+            unique.append(resolved)
+        _LOG.info("Discovered %s candidate file(s)", len(unique))
+        return self._scan_file_list(unique, target=target, started_at=started_at)
+
     def scan(self, target: str | Path) -> ScanResult:
         """Discover files, detect secrets, return a structured result.
 
@@ -48,6 +66,15 @@ class Scanner:
         _LOG.info("Scan started: %s", root)
         files = self.discover_files(root)
         _LOG.info("Discovered %s candidate file(s)", len(files))
+        return self._scan_file_list(files, target=root, started_at=started_at)
+
+    def _scan_file_list(
+        self,
+        files: Sequence[Path],
+        *,
+        target: Path,
+        started_at: datetime,
+    ) -> ScanResult:
         findings: list[SecretFinding] = []
         lines_scanned = 0
         placeholders_ignored = 0
@@ -57,7 +84,8 @@ class Scanner:
             findings.extend(file_scan.findings)
             lines_scanned += file_scan.lines_scanned
             placeholders_ignored += file_scan.placeholders_ignored
-        resolved = root.resolve() if root.exists() else root
+        resolved = target.expanduser()
+        resolved = resolved.resolve() if resolved.exists() else resolved
         finished_at = datetime.now(timezone.utc)
         _LOG.info(
             "Scan completed: files=%s lines=%s findings=%s ignored=%s",
