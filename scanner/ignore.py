@@ -65,10 +65,10 @@ def load_ignore_file(path: Path) -> IgnoreRules:
     return rules
 
 
-def default_ignore_file(target: Path) -> Path | None:
-    """Return ``.secret-scanner-ignore`` next to ``target``, else at cwd if it is a parent."""
+def default_sidecar(target: Path, filename: str) -> Path | None:
+    """Return ``filename`` next to ``target``, else at cwd if cwd is a parent."""
     search = target if target.is_dir() else target.parent
-    here = search / DEFAULT_IGNORE_NAME
+    here = search / filename
     if here.is_file():
         return here
     cwd = Path.cwd().resolve()
@@ -76,10 +76,15 @@ def default_ignore_file(target: Path) -> Path | None:
         search.expanduser().resolve().relative_to(cwd)
     except ValueError:
         return None
-    cwd_file = cwd / DEFAULT_IGNORE_NAME
+    cwd_file = cwd / filename
     if cwd_file.is_file():
         return cwd_file
     return None
+
+
+def default_ignore_file(target: Path) -> Path | None:
+    """Return ``.secret-scanner-ignore`` next to ``target``, else at cwd if it is a parent."""
+    return default_sidecar(target, DEFAULT_IGNORE_NAME)
 
 
 def ignore_root(target: Path) -> Path:

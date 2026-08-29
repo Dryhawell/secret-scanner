@@ -45,6 +45,8 @@ def test_detects_fake_aws_key_on_expected_line(tmp_path: Path) -> None:
     assert aws[0].severity.value == "CRITICAL"
     assert FAKE_AWS_KEY not in aws[0].masked_value
     assert aws[0].masked_value.startswith("AKIA")
+    assert aws[0].fingerprint
+    assert FAKE_AWS_KEY not in aws[0].fingerprint
     assert aws[0].timestamp.tzinfo is timezone.utc
     assert aws[0].location() == f"{target.as_posix()}:3"
 

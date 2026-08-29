@@ -46,6 +46,7 @@ def test_finding_to_dict_has_no_plaintext_field(tmp_path: Path) -> None:
     )
     payload = finding.to_dict(root=tmp_path)
     assert "matched_text" not in payload
+    assert "fingerprint" in payload
     assert payload["masked_value"] == "AKIA****************"
     assert payload["line_number"] == 3
 

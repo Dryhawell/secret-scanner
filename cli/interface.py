@@ -10,9 +10,16 @@ import argparse
 import sys
 from pathlib import Path
 
+from scanner.baseline import (
+    BaselineError,
+    DEFAULT_BASELINE_NAME,
+    default_baseline_file,
+    load_baseline,
+    write_baseline,
+)
 from scanner.file_handler import ScanConfig
 from scanner.git_mode import GitError, list_changed_files, list_staged_files, repo_root, restrict_to_target
-from scanner.ignore import IgnoreError, default_ignore_file, load_ignore_file
+from scanner.ignore import IgnoreError, default_ignore_file, ignore_root, load_ignore_file
 from scanner.models import ScanResult, SecretFinding, Severity
 from scanner.scanner import Scanner
 from scanner.severity import (
@@ -50,6 +57,8 @@ examples:
   python main.py . --changed
   python main.py --version
   python main.py . --ignore-file .secret-scanner-ignore
+  python main.py . --update-baseline
+  python main.py . --baseline .secret-scanner-baseline.json
 """
 
 
@@ -140,6 +149,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Allowlist file (default: .secret-scanner-ignore next to the "
         "target or in the current directory, if present)",
     )
+    parser.add_argument(
+        "--baseline",
+        metavar="FILE",
+        help="Hashed baseline JSON (default: .secret-scanner-baseline.json "
+        "if present). Does not contain plaintext secrets.",
+    )
+    parser.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help="Merge current findings into the baseline file and exit 0",
+    )
     return parser
 
 
@@ -171,6 +191,35 @@ def apply_ignore_file(
     rules = load_ignore_file(path)
     config.ignore_paths.extend(rules.paths)
     config.ignore_findings.extend(rules.findings)
+
+
+def apply_baseline(
+    config: ScanConfig, namespace: argparse.Namespace, target: Path
+) -> None:
+    """Load baseline keys. Missing default file is a no-op. Skip on --update-baseline."""
+    if namespace.update_baseline:
+        return
+    if namespace.baseline:
+        path = Path(namespace.baseline)
+        if not path.is_file():
+            raise BaselineError(f"Baseline file does not exist: {path}")
+    else:
+        found = default_baseline_file(target)
+        if found is None:
+            return
+        path = found
+    config.baseline_keys.update(load_baseline(path))
+
+
+def resolve_baseline_path(namespace: argparse.Namespace, target: Path) -> Path:
+    """Path used by --update-baseline."""
+    if namespace.baseline:
+        return Path(namespace.baseline)
+    found = default_baseline_file(target)
+    if found is not None:
+        return found
+    search = target if target.is_dir() else target.parent
+    return search / DEFAULT_BASELINE_NAME
 
 
 def _use_color(no_color: bool) -> bool:
@@ -209,6 +258,7 @@ def render_text(
     print(f"Potential secrets found: {len(findings)}")
     print(f"Placeholders ignored: {result.placeholders_ignored}")
     print(f"Allowlist ignored: {result.allowlist_ignored}")
+    print(f"Baseline ignored: {result.baseline_ignored}")
     print(
         f"By severity: {format_severity_counts(count_by_severity(findings))}"
     )
@@ -278,6 +328,7 @@ def run(
     scanner = Scanner(config=build_scan_config(namespace))
     try:
         apply_ignore_file(scanner.config, namespace, target)
+        apply_baseline(scanner.config, namespace, target)
         if namespace.staged or namespace.changed:
             root = repo_root(target)
             git_files = (
@@ -301,6 +352,10 @@ def run(
         get_logger().error("%s", exc)
         print(f"Error: {exc}", file=sys.stderr)
         return 2
+    except BaselineError as exc:
+        get_logger().error("%s", exc)
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
 
     findings = sort_findings(
         filter_findings(result.findings, minimum),
@@ -320,6 +375,20 @@ def run(
         get_logger().error("Unable to write output: %s", exc)
         print(f"Error: {exc}", file=sys.stderr)
         return 2
+
+    if namespace.update_baseline:
+        try:
+            written = write_baseline(
+                resolve_baseline_path(namespace, target),
+                result.findings,
+                ignore_root(target),
+            )
+        except OSError as exc:
+            get_logger().error("Unable to write baseline: %s", exc)
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        print(f"Baseline updated: {written.as_posix()}")
+        return 0
 
     if findings:
         return 1

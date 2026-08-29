@@ -12,11 +12,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.1.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.2.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.1.0
+# Secret Scanner 1.2.0
 ```
 
 ## Why Secret Scanner?
@@ -39,6 +39,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output and JSON reports
 - `--staged` / `--changed` Git modes
 - Path / finding allowlist (`.secret-scanner-ignore`)
+- Hashed finding baseline (SHA-256, no plaintext)
 - File logging without secret values
 - Exit codes for CI (`0` clean, `1` findings, `2` error)
 
@@ -133,6 +134,8 @@ python main.py [path] [options]
 | `--no-color` | Disable ANSI colors |
 | `--verbose` | DEBUG per-file lines in the log file |
 | `--ignore-file FILE` | Allowlist (default: `.secret-scanner-ignore` if present) |
+| `--baseline FILE` | Hashed baseline JSON (default: `.secret-scanner-baseline.json` if present) |
+| `--update-baseline` | Merge current findings into the baseline and exit 0 |
 | `--version` | Print the version and exit |
 
 `--staged` and `--changed` are mutually exclusive. They require a Git repository
@@ -154,6 +157,8 @@ python main.py . --format json -o -
 python main.py . --verbose --no-color
 python main.py --version
 python main.py . --ignore-file .secret-scanner-ignore
+python main.py . --update-baseline
+python main.py . --baseline .secret-scanner-baseline.json
 ```
 
 ## Ignore rules
@@ -176,6 +181,22 @@ scanner/detector.py | Contextual Secret
 the scanner loads `.secret-scanner-ignore` next to the target, or from the
 current directory when that directory is a parent of the target.
 
+## Baseline
+
+Ignore skips a **path**. Baseline skips a **specific hashed value in a file**.
+A new key in the same file still fails. The same value copied to another file
+still fails.
+
+```text
+python main.py . --update-baseline
+python main.py . --baseline .secret-scanner-baseline.json
+```
+
+The file stores SHA-256 fingerprints plus a masked prefix — never the
+plaintext secret. The default filename is not scanned as source. Review
+findings before updating. Rotating a real credential is still required; the
+baseline only means “we already triaged this hash.”
+
 Example terminal output (values are **masked**; this is a fake AWS key ID):
 
 ```text
@@ -188,6 +209,7 @@ Lines scanned: 840
 Potential secrets found: 2
 Placeholders ignored: 1
 Allowlist ignored: 0
+Baseline ignored: 0
 By severity: CRITICAL=1  HIGH=1  MEDIUM=0  LOW=0
 
 CRITICAL
@@ -302,8 +324,9 @@ mode, and the CI workflow file. All credentials in tests are fakes.
   negatives by design, for performance).
 - `--staged` does not scan untracked files; `--changed` does not equal
   “the whole repository”.
-- Allowlist is path/finding-name based, not a hashed secret baseline. An
-  ignored path will not report a newly added live key.
+- Allowlist is path/finding-name based. An ignored path will not report a newly
+  added live key. Baseline hashes a specific value in a file; it is not a
+  substitute for rotation.
 - No YAML config, SARIF, HTML report, or pre-commit hook installer in this
   version.
 - Detection is never 100% accurate.
@@ -325,6 +348,8 @@ scanner/
   models.py             SecretFinding, ScanResult
   git_mode.py           staged / changed file lists
   ignore.py             path / finding allowlist
+  fingerprint.py        SHA-256 secret id (no plaintext)
+  baseline.py           hashed finding baseline
   scanner.py            orchestration
 utils/logger.py         file logs, no secret values
 utils/reporter.py       masked JSON
@@ -333,7 +358,7 @@ tests/                  pytest
 ```
 
 Runtime modules: `pathlib`, `re`, `json`, `argparse`, `logging`, `datetime`,
-`dataclasses`, `subprocess` (Git). No network calls.
+`dataclasses`, `subprocess` (Git), `hashlib`. No network calls.
 
 ## Roadmap
 
@@ -341,7 +366,6 @@ Possible later work (not in the current tree):
 
 - Git pre-commit hook installer
 - YAML configuration and custom regexes
-- Hashed secret baseline
 - SARIF and HTML reports
 - Git history scanning
 - Parallel scanning

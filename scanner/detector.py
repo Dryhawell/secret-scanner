@@ -15,6 +15,7 @@ from scanner.confidence import calculate_confidence
 from scanner.context import CONTEXTUAL_PATTERN_NAME, find_context_hits
 from scanner.entropy import ENTROPY_GATED_PATTERNS, is_low_entropy
 from scanner.filters import is_placeholder
+from scanner.fingerprint import secret_id
 from scanner.models import SecretFinding
 from scanner.patterns import PatternEngine
 from scanner.severity import severity_for
@@ -101,6 +102,7 @@ class Detector:
                     confidence=calculate_confidence(
                         match.pattern_name, match.matched_text, line
                     ),
+                    fingerprint=secret_id(match.pattern_name, match.matched_text),
                 )
             )
 
@@ -129,6 +131,7 @@ class Detector:
                     confidence=calculate_confidence(
                         CONTEXTUAL_PATTERN_NAME, hit.value, line
                     ),
+                    fingerprint=secret_id(CONTEXTUAL_PATTERN_NAME, hit.value),
                 )
             )
         return findings, ignored

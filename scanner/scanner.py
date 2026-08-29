@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 
+from scanner.baseline import is_baselined
 from scanner.detector import Detector
 from scanner.file_handler import ScanConfig, iter_scan_files, should_scan_file
 from scanner.ignore import ignore_root, is_ignored_finding, is_ignored_path
@@ -86,6 +87,8 @@ class Scanner:
         lines_scanned = 0
         placeholders_ignored = 0
         allowlist_ignored = 0
+        baseline_ignored = 0
+        root = ignore_root(target)
         for path in files:
             _LOG.debug("Scanning file %s", path)
             file_scan = self.detector.scan_file(path)
@@ -95,7 +98,7 @@ class Scanner:
                 if is_ignored_finding(
                     finding.file_path,
                     finding.pattern_name,
-                    ignore_root(target),
+                    root,
                     self.config.ignore_findings,
                 ):
                     allowlist_ignored += 1
@@ -106,17 +109,27 @@ class Scanner:
                         finding.line_number,
                     )
                     continue
+                if is_baselined(finding, root, self.config.baseline_keys):
+                    baseline_ignored += 1
+                    _LOG.debug(
+                        "Baseline dropped %s at %s:%s",
+                        finding.pattern_name,
+                        path.name,
+                        finding.line_number,
+                    )
+                    continue
                 findings.append(finding)
         resolved = target.expanduser()
         resolved = resolved.resolve() if resolved.exists() else resolved
         finished_at = datetime.now(timezone.utc)
         _LOG.info(
-            "Scan completed: files=%s lines=%s findings=%s ignored=%s allowlist=%s",
+            "Scan completed: files=%s lines=%s findings=%s ignored=%s allowlist=%s baseline=%s",
             len(files),
             lines_scanned,
             len(findings),
             placeholders_ignored,
             allowlist_ignored,
+            baseline_ignored,
         )
         return ScanResult(
             target=resolved,
@@ -127,4 +140,5 @@ class Scanner:
             findings=tuple(findings),
             placeholders_ignored=placeholders_ignored,
             allowlist_ignored=allowlist_ignored,
+            baseline_ignored=baseline_ignored,
         )

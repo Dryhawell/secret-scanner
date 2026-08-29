@@ -67,6 +67,10 @@ BINARY_SNIFF_BYTES = 8192
 # line-by-line regex. Source trees rarely need more than a few megabytes.
 DEFAULT_MAX_FILE_SIZE = 5 * 1024 * 1024
 
+# Hashed baseline JSON uses the key "fingerprint"; still skip the default
+# filename so a committed baseline is never scanned as source.
+_SKIP_FILENAMES = frozenset({".secret-scanner-baseline.json"})
+
 
 @dataclass
 class ScanConfig:
@@ -92,6 +96,7 @@ class ScanConfig:
     max_file_size_bytes: int | None = DEFAULT_MAX_FILE_SIZE
     ignore_paths: list[str] = field(default_factory=list)
     ignore_findings: list[tuple[str, str]] = field(default_factory=list)
+    baseline_keys: set[tuple[str, str]] = field(default_factory=set)
 
     def __post_init__(self) -> None:
         """Normalize names so Windows and Linux behave the same."""
@@ -168,6 +173,8 @@ def should_scan_file(path: Path, config: ScanConfig) -> bool:
     if config.skip_symlinks and path.is_symlink():
         return False
     if not path.is_file():
+        return False
+    if path.name.casefold() in _SKIP_FILENAMES:
         return False
     if has_excluded_extension(path, config):
         return False

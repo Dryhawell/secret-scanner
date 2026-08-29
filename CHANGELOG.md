@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0 — 2026-08-29
+
+### Added
+
+- SHA-256 finding fingerprints (`secret_id`) computed at detection time
+- `.secret-scanner-baseline.json` plus `--baseline` / `--update-baseline`
+- `baseline_ignored` in scan results and JSON reports
+
 ## 1.1.0 — 2026-08-29
 
 ### Added

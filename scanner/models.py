@@ -64,6 +64,7 @@ class SecretFinding:
     pattern_name: str
     timestamp: datetime = field(default_factory=_utc_now)
     confidence: int = 0
+    fingerprint: str = ""
 
     def location(self, root: Path | None = None) -> str:
         """Return ``path:line`` in GitHub-style form, using forward slashes."""
@@ -88,6 +89,7 @@ class SecretFinding:
             "masked_value": self.masked_value,
             "description": self.description,
             "pattern_name": self.pattern_name,
+            "fingerprint": self.fingerprint,
             "timestamp": self.timestamp.isoformat(),
         }
 
@@ -104,6 +106,7 @@ class ScanResult:
     findings: tuple[SecretFinding, ...]
     placeholders_ignored: int = 0
     allowlist_ignored: int = 0
+    baseline_ignored: int = 0
 
     @property
     def findings_count(self) -> int:
@@ -124,5 +127,6 @@ class ScanResult:
             "findings_count": self.findings_count,
             "placeholders_ignored": self.placeholders_ignored,
             "allowlist_ignored": self.allowlist_ignored,
+            "baseline_ignored": self.baseline_ignored,
             "findings": [item.to_dict(root=root) for item in self.findings],
         }
