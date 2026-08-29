@@ -11,6 +11,7 @@ from scanner.entropy import shannon_entropy
 from scanner.filters import is_placeholder
 from scanner.file_handler import ScanConfig
 from scanner.git_mode import GitError
+from scanner.hook import HookError
 from scanner.ignore import IgnoreError
 from scanner.models import PatternMatch, ScanResult, SecretFinding, SecretPattern, Severity
 from scanner.patterns import PatternEngine
@@ -25,6 +26,7 @@ __all__ = [
     "Detector",
     "FileScan",
     "GitError",
+    "HookError",
     "IgnoreError",
     "is_placeholder",
     "is_sensitive_identifier",

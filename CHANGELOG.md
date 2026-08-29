@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0 — 2026-08-29
+
+### Added
+
+- Committed `hooks/pre-commit` template (scans staged files, blocks on findings)
+- `python main.py --install-hook` copies the template into `.git/hooks/pre-commit`
+- `--force-hook` overwrites an existing hook
+
 ## 1.2.0 — 2026-08-29
 
 ### Added

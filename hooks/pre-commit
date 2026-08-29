@@ -1,0 +1,23 @@
+#!/bin/sh
+# Secret Scanner — scan staged files before commit. Exit 1 blocks the commit.
+# Installed by: python main.py --install-hook
+set -e
+ROOT=$(git rev-parse --show-toplevel) || exit 2
+cd "$ROOT" || exit 2
+
+if [ ! -f "$ROOT/main.py" ]; then
+  echo "secret-scanner: main.py not found in $ROOT" >&2
+  echo "This hook expects the Secret Scanner entry point in the repository root." >&2
+  exit 2
+fi
+
+if command -v python >/dev/null 2>&1; then
+  PY=python
+elif command -v python3 >/dev/null 2>&1; then
+  PY=python3
+else
+  echo "secret-scanner: python not found on PATH" >&2
+  exit 2
+fi
+
+exec "$PY" "$ROOT/main.py" . --staged --no-color

@@ -19,6 +19,7 @@ from scanner.baseline import (
 )
 from scanner.file_handler import ScanConfig
 from scanner.git_mode import GitError, list_changed_files, list_staged_files, repo_root, restrict_to_target
+from scanner.hook import HookError, install_pre_commit_hook
 from scanner.ignore import IgnoreError, default_ignore_file, ignore_root, load_ignore_file
 from scanner.models import ScanResult, SecretFinding, Severity
 from scanner.scanner import Scanner
@@ -59,6 +60,7 @@ examples:
   python main.py . --ignore-file .secret-scanner-ignore
   python main.py . --update-baseline
   python main.py . --baseline .secret-scanner-baseline.json
+  python main.py --install-hook
 """
 
 
@@ -159,6 +161,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--update-baseline",
         action="store_true",
         help="Merge current findings into the baseline file and exit 0",
+    )
+    parser.add_argument(
+        "--install-hook",
+        action="store_true",
+        help="Install a local Git pre-commit hook that scans staged files",
+    )
+    parser.add_argument(
+        "--force-hook",
+        action="store_true",
+        help="Overwrite an existing pre-commit hook (used with --install-hook)",
     )
     return parser
 
@@ -324,6 +336,18 @@ def run(
         get_logger().error("Target does not exist: %s", target)
         print(f"Error: Target does not exist: {target}", file=sys.stderr)
         return 2
+
+    if namespace.install_hook:
+        try:
+            dest = install_pre_commit_hook(
+                repo_root(target), force=namespace.force_hook
+            )
+        except (GitError, HookError) as exc:
+            get_logger().error("%s", exc)
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        print(f"Installed pre-commit hook: {dest.as_posix()}")
+        return 0
 
     scanner = Scanner(config=build_scan_config(namespace))
     try:

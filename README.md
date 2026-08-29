@@ -12,11 +12,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.2.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.3.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.2.0
+# Secret Scanner 1.3.0
 ```
 
 ## Why Secret Scanner?
@@ -40,6 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - `--staged` / `--changed` Git modes
 - Path / finding allowlist (`.secret-scanner-ignore`)
 - Hashed finding baseline (SHA-256, no plaintext)
+- Optional local Git pre-commit hook (`--install-hook`)
 - File logging without secret values
 - Exit codes for CI (`0` clean, `1` findings, `2` error)
 
@@ -136,6 +137,8 @@ python main.py [path] [options]
 | `--ignore-file FILE` | Allowlist (default: `.secret-scanner-ignore` if present) |
 | `--baseline FILE` | Hashed baseline JSON (default: `.secret-scanner-baseline.json` if present) |
 | `--update-baseline` | Merge current findings into the baseline and exit 0 |
+| `--install-hook` | Copy `hooks/pre-commit` into `.git/hooks/pre-commit` |
+| `--force-hook` | Overwrite an existing hook |
 | `--version` | Print the version and exit |
 
 `--staged` and `--changed` are mutually exclusive. They require a Git repository
@@ -159,6 +162,7 @@ python main.py --version
 python main.py . --ignore-file .secret-scanner-ignore
 python main.py . --update-baseline
 python main.py . --baseline .secret-scanner-baseline.json
+python main.py --install-hook
 ```
 
 ## Ignore rules
@@ -196,6 +200,25 @@ The file stores SHA-256 fingerprints plus a masked prefix — never the
 plaintext secret. The default filename is not scanned as source. Review
 findings before updating. Rotating a real credential is still required; the
 baseline only means “we already triaged this hash.”
+
+## Pre-commit hook
+
+The committed file `hooks/pre-commit` is a template. Git does not run it until
+it is copied into `.git/hooks/pre-commit` (that copy is local and is not
+committed).
+
+```text
+python main.py --install-hook
+python main.py --install-hook --force-hook
+```
+
+The hook runs `python main.py . --staged --no-color` from the repository root.
+Untracked files are not scanned. Exit `1` from the scanner blocks the commit.
+
+This is a local convenience, not a security control. Anyone can skip it with
+`git commit --no-verify`. Keep the CI product scan.
+
+## Example terminal output
 
 Example terminal output (values are **masked**; this is a fake AWS key ID):
 
@@ -312,7 +335,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-mode, and the CI workflow file. All credentials in tests are fakes.
+mode, the hook installer, and the CI workflow file. All credentials in tests are fakes.
 
 ## Limitations
 
@@ -327,8 +350,9 @@ mode, and the CI workflow file. All credentials in tests are fakes.
 - Allowlist is path/finding-name based. An ignored path will not report a newly
   added live key. Baseline hashes a specific value in a file; it is not a
   substitute for rotation.
-- No YAML config, SARIF, HTML report, or pre-commit hook installer in this
-  version.
+- The pre-commit hook is local and bypassable (`git commit --no-verify`).
+  It is not a substitute for CI.
+- No YAML config, SARIF, or HTML report in this version.
 - Detection is never 100% accurate.
 
 ## Architecture
@@ -350,9 +374,11 @@ scanner/
   ignore.py             path / finding allowlist
   fingerprint.py        SHA-256 secret id (no plaintext)
   baseline.py           hashed finding baseline
+  hook.py               copy template into .git/hooks
   scanner.py            orchestration
 utils/logger.py         file logs, no secret values
 utils/reporter.py       masked JSON
+hooks/pre-commit         committed hook template
 tests/                  pytest
 .github/workflows/     CI
 ```
@@ -364,7 +390,6 @@ Runtime modules: `pathlib`, `re`, `json`, `argparse`, `logging`, `datetime`,
 
 Possible later work (not in the current tree):
 
-- Git pre-commit hook installer
 - YAML configuration and custom regexes
 - SARIF and HTML reports
 - Git history scanning
@@ -379,7 +404,7 @@ authorized to access.
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for the v1.0.0 release notes.
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

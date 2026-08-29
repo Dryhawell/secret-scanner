@@ -42,6 +42,17 @@ def _run_git(root: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
         raise GitError("git command timed out.") from exc
 
 
+def git_dir(root: Path) -> Path:
+    """Return the ``.git`` directory (handles worktrees where ``.git`` is a file)."""
+    result = _run_git(root, ["rev-parse", "--git-dir"])
+    if result.returncode != 0:
+        raise GitError(result.stderr.strip() or "git rev-parse --git-dir failed")
+    raw = Path(result.stdout.strip())
+    if not raw.is_absolute():
+        raw = (root / raw).resolve()
+    return raw
+
+
 def repo_root(start: Path) -> Path:
     """Return the repository toplevel that contains ``start``."""
     start = start.expanduser().resolve()
