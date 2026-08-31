@@ -23,6 +23,7 @@ from scanner.git_mode import GitError, list_changed_files, list_staged_files, re
 from scanner.hook import HookError, install_pre_commit_hook
 from scanner.ignore import IgnoreError, default_ignore_file, ignore_root, load_ignore_file
 from scanner.models import ScanResult, SecretFinding, Severity
+from scanner.patterns import merged_engine
 from scanner.scanner import Scanner
 from scanner.severity import (
     count_by_severity,
@@ -399,7 +400,10 @@ def run(
     minimum = Severity(namespace.severity or settings.severity or Severity.LOW.value)
     color = _use_color(namespace.no_color or (settings.no_color is True))
 
-    scanner = Scanner(config=build_scan_config(namespace, settings))
+    scanner = Scanner(
+        config=build_scan_config(namespace, settings),
+        engine=merged_engine(settings.patterns),
+    )
     try:
         apply_ignore_file(scanner.config, namespace, target, settings)
         apply_baseline(scanner.config, namespace, target, settings)

@@ -122,3 +122,11 @@ class PatternEngine:
                     )
                 )
         return matches
+
+
+def merged_engine(extra: Sequence[SecretPattern] | None = None) -> PatternEngine:
+    """Built-in catalog plus optional custom patterns from a config file."""
+    extra = extra or ()
+    if not extra:
+        return PatternEngine()
+    return PatternEngine([*default_patterns(), *extra])

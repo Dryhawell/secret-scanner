@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0 — 2026-08-31
+
+### Added
+
+- `patterns` in the project config: custom regexes that extend the built-in catalog
+- YAML list-of-mapping support for those pattern objects
+- Compile-time checks: invalid regex, empty-string match, reserved/duplicate names
+
 ## 1.4.0 — 2026-08-31
 
 ### Added

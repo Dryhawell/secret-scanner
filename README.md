@@ -12,11 +12,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.4.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.5.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.4.0
+# Secret Scanner 1.5.0
 ```
 
 ## Why Secret Scanner?
@@ -42,6 +42,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Hashed finding baseline (SHA-256, no plaintext)
 - Optional local Git pre-commit hook (`--install-hook`)
 - JSON / subset-YAML project config (`--config`)
+- Custom detection regexes in that config (`patterns`)
 - File logging without secret values
 - Exit codes for CI (`0` clean, `1` findings, `2` error)
 
@@ -221,14 +222,37 @@ JSON:
   "no_color": true,
   "format": "text",
   "ignore_file": ".secret-scanner-ignore",
-  "baseline": ".secret-scanner-baseline.json"
+  "baseline": ".secret-scanner-baseline.json",
+  "patterns": [
+    {
+      "name": "Internal Token",
+      "regex": "intok_[A-Za-z0-9]{16}",
+      "severity": "HIGH",
+      "description": "Company-internal token prefix"
+    }
+  ]
 }
 ```
 
 YAML is a **restricted subset** (no PyYAML): `key: value`, booleans, `#`
-comments, and indented dash lists. Anchors, tags, and nested maps are
-rejected. Unknown keys fail the run (exit `2`). Custom regexes are not in
-this schema yet.
+comments, indented dash lists, and a list of flat mappings for `patterns`.
+Anchors, tags, and deeper nesting are rejected. Unknown keys fail the run
+(exit `2`).
+
+Custom `patterns` **extend** the built-in catalog. They cannot reuse a
+built-in name (including `Contextual Secret`). A regex that matches the
+empty string is rejected. Invalid regex → exit `2`. Keep patterns specific:
+`.+` will match whole lines and is noisy; some regexes can also be slow
+(catastrophic backtracking).
+
+YAML:
+
+```text
+patterns:
+  - name: Internal Token
+    regex: intok_[A-Za-z0-9]{16}
+    severity: HIGH
+```
 
 Default config filenames are not scanned as source.
 
@@ -366,7 +390,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-mode, the hook installer, project config files, and the CI workflow file. All credentials in tests are fakes.
+mode, the hook installer, project config files, custom patterns, and the CI workflow file. All credentials in tests are fakes.
 
 ## Limitations
 
@@ -383,8 +407,9 @@ mode, the hook installer, project config files, and the CI workflow file. All cr
   substitute for rotation.
 - The pre-commit hook is local and bypassable (`git commit --no-verify`).
   It is not a substitute for CI.
-- YAML config is a documented subset, not a full YAML 1.1 parser. There is
-  no custom regex catalog in this version.
+- YAML config is a documented subset, not a full YAML 1.1 parser.
+- Custom regexes cannot replace built-in rules. A broad pattern will
+  create noise; a regex that matches the empty string is rejected.
 - No SARIF or HTML report in this version.
 - Detection is never 100% accurate.
 
@@ -395,7 +420,7 @@ main.py                 entry point (exit code from cli)
 cli/interface.py        argparse, text/JSON output, Git flags
 scanner/
   file_handler.py       discovery, excludes, binary/size caps
-  patterns.py           compiled regex catalog
+  patterns.py           compiled regex catalog (plus config custom patterns)
   detector.py           line-by-line scan, masking
   context.py            sensitive assignments
   filters.py            placeholder / dummy values
@@ -408,7 +433,7 @@ scanner/
   fingerprint.py        SHA-256 secret id (no plaintext)
   baseline.py           hashed finding baseline
   hook.py               copy template into .git/hooks
-  config_file.py        JSON / subset-YAML project config
+  config_file.py        JSON / subset-YAML project config (including patterns)
   scanner.py            orchestration
 utils/logger.py         file logs, no secret values
 utils/reporter.py       masked JSON
@@ -424,7 +449,6 @@ Runtime modules: `pathlib`, `re`, `json`, `argparse`, `logging`, `datetime`,
 
 Possible later work (not in the current tree):
 
-- Custom detection regexes
 - SARIF and HTML reports
 - Git history scanning
 - Parallel scanning

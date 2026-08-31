@@ -46,7 +46,12 @@ def test_parse_yaml_subset_with_list_and_comment() -> None:
 
 def test_unknown_key_is_rejected() -> None:
     with pytest.raises(ConfigError, match="Unknown config key"):
-        settings_from_mapping({"patterns": []}, base=Path("."))
+        settings_from_mapping({"nope": 1}, base=Path("."))
+
+
+def test_empty_patterns_list_is_allowed() -> None:
+    settings = settings_from_mapping({"patterns": []}, base=Path("."))
+    assert settings.patterns == ()
 
 
 def test_invalid_severity_is_rejected() -> None:
