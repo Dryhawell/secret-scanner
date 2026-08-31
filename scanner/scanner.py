@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
 from scanner.baseline import is_baselined
-from scanner.detector import Detector
-from scanner.file_handler import ScanConfig, has_excluded_extension, iter_scan_files, should_scan_file
+from scanner.detector import Detector, FileScan
+from scanner.file_handler import (
+    ScanConfig,
+    has_excluded_extension,
+    iter_scan_files,
+    resolve_jobs,
+    should_scan_file,
+)
 from scanner.history import HistoryLine
 from scanner.ignore import ignore_root, is_ignored_finding, is_ignored_path
 from scanner.models import ScanResult, SecretFinding
@@ -143,6 +150,11 @@ class Scanner:
             baseline_ignored=baseline_ignored,
         )
 
+    def _scan_one_file(self, path: Path) -> FileScan:
+        """Scan one file. Safe to call from a worker thread."""
+        _LOG.debug("Scanning file %s", path)
+        return self.detector.scan_file(path)
+
     def _scan_file_list(
         self,
         files: Sequence[Path],
@@ -156,9 +168,15 @@ class Scanner:
         allowlist_ignored = 0
         baseline_ignored = 0
         root = ignore_root(target)
-        for path in files:
-            _LOG.debug("Scanning file %s", path)
-            file_scan = self.detector.scan_file(path)
+        workers = resolve_jobs(self.config.jobs)
+        _LOG.info("Scan workers: %s", workers)
+        if workers == 1 or len(files) < 2:
+            scans = [self._scan_one_file(path) for path in files]
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                pending = [pool.submit(self._scan_one_file, path) for path in files]
+                scans = [item.result() for item in pending]
+        for path, file_scan in zip(files, scans, strict=True):
             lines_scanned += file_scan.lines_scanned
             placeholders_ignored += file_scan.placeholders_ignored
             for finding in file_scan.findings:

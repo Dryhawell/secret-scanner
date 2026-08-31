@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from scanner.file_handler import MAX_JOBS
 from scanner.ignore import default_sidecar
 from scanner.models import SecretPattern, Severity
 from utils.logger import get_logger
@@ -39,6 +40,7 @@ _ALLOWED_KEYS = frozenset(
         "ignore_file",
         "baseline",
         "patterns",
+        "jobs",
     }
 )
 _PATTERN_KEYS = frozenset(
@@ -76,6 +78,7 @@ class FileSettings:
     ignore_file: Path | None = None
     baseline: Path | None = None
     patterns: tuple[SecretPattern, ...] = ()
+    jobs: int | None = None
 
 
 def default_config_file(target: Path) -> Path | None:
@@ -318,6 +321,7 @@ def settings_from_mapping(data: dict[str, object], *, base: Path) -> FileSetting
         ignore_file=_optional_path(data, "ignore_file", base),
         baseline=_optional_path(data, "baseline", base),
         patterns=_custom_patterns(data),
+        jobs=_optional_jobs(data, "jobs"),
     )
 
 
@@ -457,6 +461,21 @@ def _required_string(data: dict[str, object], key: str) -> str:
     value = _optional_string(data, key)
     if value is None:
         raise ConfigError(f"Pattern is missing {key}.")
+    return value
+
+
+def _optional_jobs(data: dict[str, object], key: str) -> int | None:
+    if key not in data or data[key] is None:
+        return None
+    value = data[key]
+    if isinstance(value, str) and value.isdigit():
+        value = int(value)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ConfigError(f"Config {key} must be an integer 0-{MAX_JOBS}.")
+    if value < 0 or value > MAX_JOBS:
+        raise ConfigError(
+            f"Config {key} must be between 0 and {MAX_JOBS} (0 = auto)."
+        )
     return value
 
 

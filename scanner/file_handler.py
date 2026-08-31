@@ -10,6 +10,7 @@ Why this split exists:
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from collections.abc import Iterator
@@ -67,6 +68,9 @@ BINARY_SNIFF_BYTES = 8192
 # line-by-line regex. Source trees rarely need more than a few megabytes.
 DEFAULT_MAX_FILE_SIZE = 5 * 1024 * 1024
 
+# Thread pool size for file scans. 0 on the CLI means "use CPU count".
+MAX_JOBS = 32
+
 # Hashed baseline JSON uses the key "fingerprint"; still skip the default
 # filename so a committed baseline is never scanned as source.
 _SKIP_FILENAMES = frozenset(
@@ -104,6 +108,7 @@ class ScanConfig:
     ignore_paths: list[str] = field(default_factory=list)
     ignore_findings: list[tuple[str, str]] = field(default_factory=list)
     baseline_keys: set[tuple[str, str]] = field(default_factory=set)
+    jobs: int = 1
 
     def __post_init__(self) -> None:
         """Normalize names so Windows and Linux behave the same."""
@@ -119,6 +124,13 @@ class ScanConfig:
     def exclude_dir(self, name: str) -> None:
         """Skip directories named ``name`` (compared case-insensitively)."""
         self.excluded_dirs.add(name.casefold())
+
+
+def resolve_jobs(requested: int) -> int:
+    """Return a worker count in ``1..MAX_JOBS``. ``0`` means CPU count."""
+    if requested == 0:
+        return min(MAX_JOBS, os.cpu_count() or 1)
+    return min(MAX_JOBS, max(1, requested))
 
 
 def is_excluded_directory(path: Path, config: ScanConfig) -> bool:

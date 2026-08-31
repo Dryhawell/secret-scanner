@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.9.0 — 2026-08-31
+
+### Added
+
+- `--jobs` / `-j` worker threads for working-tree and staged/changed scans
+- Config key `jobs` (0 = CPU count, default 1, max 32)
+- Finding order stays the file-discovery order (not completion order)
+
 ## 1.8.0 — 2026-08-31
 
 ### Added

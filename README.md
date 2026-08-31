@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.8.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.9.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.8.0
+# Secret Scanner 1.9.0
 ```
 
 ## Why Secret Scanner?
@@ -39,6 +39,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Severity (CRITICAL → LOW) and confidence (5–99)
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, plus `--history` for recent commits
+- `--jobs` worker threads for file scans (default 1)
 - Path / finding allowlist (`.secret-scanner-ignore`)
 - Hashed finding baseline (SHA-256, no plaintext)
 - Optional local Git pre-commit hook (`--install-hook`)
@@ -135,6 +136,7 @@ python main.py [path] [options]
 | `--changed` | Working tree vs `HEAD`, plus untracked files |
 | `--history` | Scan added lines in recent Git commits (not the working tree) |
 | `--history-depth N` | How many recent commits `--history` reads (default: 200, max 5000) |
+| `--jobs N` / `-j N` | Worker threads for file scans (default: 1, `0` = CPU count, max 32) |
 | `--format text\|json\|sarif\|html` | Terminal text, JSON, SARIF 2.1.0, or HTML under `reports/` |
 | `--output FILE` / `-o -` | Write JSON, SARIF, or HTML to a file, or stdout |
 | `--no-color` | Disable ANSI colors |
@@ -164,6 +166,7 @@ python main.py . --staged
 python main.py . --changed
 python main.py . --history
 python main.py . --history --history-depth 500
+python main.py . --jobs 4
 python main.py . --format json
 python main.py . --output reports/latest.json
 python main.py . --format json -o -
@@ -221,7 +224,8 @@ baseline only means “we already triaged this hash.”
 Commit a `.secret-scanner.json` (preferred) or `.secret-scanner.yml` next
 to the scan root. `--config FILE` must exist when given (exit `2` if missing).
 CLI flags override the file. Relative `ignore_file` / `baseline` paths are
-resolved from the config file's directory.
+resolved from the config file's directory. `jobs` is a worker-thread count
+(`0` = CPU count).
 
 JSON:
 
@@ -234,6 +238,7 @@ JSON:
   "format": "text",
   "ignore_file": ".secret-scanner-ignore",
   "baseline": ".secret-scanner-baseline.json",
+  "jobs": 4,
   "patterns": [
     {
       "name": "Internal Token",
@@ -441,9 +446,9 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-and history modes, the hook installer, project config files, custom patterns,
-SARIF and HTML reports, and the CI workflow file. All credentials in tests
-are fakes.
+and history modes, parallel file scans, the hook installer, project config
+files, custom patterns, SARIF and HTML reports, and the CI workflow file. All
+credentials in tests are fakes.
 
 ## Limitations
 
@@ -472,6 +477,10 @@ are fakes.
   create noise; a regex that matches the empty string is rejected.
 - SARIF reports omit source snippets so GitHub Code Scanning cannot leak
   the original line. HTML reports are escaped and also omit snippets.
+- `--jobs` uses threads (`concurrent.futures`). CPython's GIL means regex
+  matching does not scale linearly with cores; overlapping file reads still
+  help. Default is 1 (same as a sequential scan). `--history` stays
+  single-threaded.
 - Detection is never 100% accurate.
 
 ## Architecture
@@ -496,7 +505,7 @@ scanner/
   baseline.py           hashed finding baseline
   hook.py               copy template into .git/hooks
   config_file.py        JSON / subset-YAML project config (including patterns)
-  scanner.py            orchestration
+  scanner.py            orchestration (optional thread pool for files)
 utils/logger.py         file logs, no secret values
 utils/reporter.py       masked JSON
 utils/sarif.py          SARIF 2.1.0 (no snippets)
@@ -507,13 +516,13 @@ tests/                  pytest
 ```
 
 Runtime modules: `pathlib`, `re`, `json`, `argparse`, `logging`, `datetime`,
-`dataclasses`, `subprocess` (Git), `hashlib`. No network calls.
+`dataclasses`, `subprocess` (Git), `hashlib`, `concurrent.futures`. No network
+calls.
 
 ## Roadmap
 
 Possible later work (not in the current tree):
 
-- Parallel scanning
 - GUI / dashboard
 
 ## Authorized / Responsible Use

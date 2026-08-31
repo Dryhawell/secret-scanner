@@ -19,7 +19,7 @@ from scanner.baseline import (
     write_baseline,
 )
 from scanner.config_file import ConfigError, FileSettings, load_config_file, resolve_config_path
-from scanner.file_handler import ScanConfig
+from scanner.file_handler import MAX_JOBS, ScanConfig, resolve_jobs
 from scanner.git_mode import GitError, list_changed_files, list_staged_files, repo_root, restrict_to_target
 from scanner.history import list_history_lines, path_in_target
 from scanner.hook import HookError, install_pre_commit_hook
@@ -67,6 +67,7 @@ examples:
   python main.py . --staged
   python main.py . --changed
   python main.py . --history
+  python main.py . --jobs 4
   python main.py --version
   python main.py . --ignore-file .secret-scanner-ignore
   python main.py . --update-baseline
@@ -170,6 +171,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="How many recent commits --history reads (default: 200, max 5000)",
     )
     parser.add_argument(
+        "--jobs",
+        "-j",
+        type=_parse_jobs,
+        default=None,
+        metavar="N",
+        help="Worker threads for file scans (default: 1, 0 = CPU count, max 32). "
+        "Does not apply to --history.",
+    )
+    parser.add_argument(
         "--ignore-file",
         metavar="FILE",
         help="Allowlist file (default: .secret-scanner-ignore next to the "
@@ -205,6 +215,19 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _parse_jobs(raw: str) -> int:
+    """Argparse type for --jobs. 0 means auto (CPU count)."""
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("jobs must be an integer") from exc
+    if value < 0 or value > MAX_JOBS:
+        raise argparse.ArgumentTypeError(
+            f"jobs must be between 0 and {MAX_JOBS} (0 = auto)"
+        )
+    return value
+
+
 def resolve_target(namespace: argparse.Namespace) -> Path:
     raw = namespace.path_option or namespace.path or "."
     return Path(raw)
@@ -223,6 +246,12 @@ def build_scan_config(
     names.extend(namespace.exclude)
     for name in names:
         config.exclude_dir(name)
+    requested = 1
+    if settings is not None and settings.jobs is not None:
+        requested = settings.jobs
+    if namespace.jobs is not None:
+        requested = namespace.jobs
+    config.jobs = resolve_jobs(requested)
     return config
 
 
