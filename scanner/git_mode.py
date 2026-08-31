@@ -127,6 +127,41 @@ def list_changed_files(root: Path) -> list[Path]:
     return unique
 
 
+def validate_since_ref(ref: str) -> str:
+    """Return a single git ref, or raise GitError.
+
+    A range (``..``) is rejected so the caller always forms ``REF...HEAD``.
+    Leading dashes are rejected so the value cannot be parsed as a git flag.
+    """
+    text = ref.strip()
+    if not text or "\x00" in text:
+        raise GitError("--since requires a git ref (branch, tag, or SHA)")
+    if text.startswith("-"):
+        raise GitError("--since ref must not start with '-'")
+    if ".." in text:
+        raise GitError("--since expects a single ref, not a range (use origin/main, not a..b)")
+    return text
+
+
+def list_since_files(root: Path, ref: str) -> list[Path]:
+    """Files changed from the merge-base of ``ref`` and HEAD (``REF...HEAD``).
+
+    Untracked files are not included. A secret that already existed on ``ref``
+    and was not touched is a false negative by design — use a full tree scan
+    or ``--history`` for that.
+    """
+    spec = f"{validate_since_ref(ref)}...HEAD"
+    result = _run_git(
+        root,
+        ["diff", "--name-only", "-z", f"--diff-filter={_DIFF_FILTER}", spec],
+    )
+    if result.returncode != 0:
+        raise GitError(result.stderr.strip() or f"git diff {spec} failed")
+    paths = _split_nul(result.stdout, root)
+    _LOG.info("Git since files: %s (range=%s)", len(paths), spec)
+    return paths
+
+
 _HISTORY_GIT_TIMEOUT_SECONDS = 120
 _COMMIT_PRETTY = "===COMMIT %H==="
 

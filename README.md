@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.11.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.12.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.11.0
+# Secret Scanner 1.12.0
 ```
 
 ## Why Secret Scanner?
@@ -38,7 +38,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Shannon entropy as a supporting signal (not a standalone detector)
 - Severity (CRITICAL → LOW) and confidence (5–99)
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
-- `--staged` / `--changed` Git modes, plus `--history` for recent commits
+- `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--jobs` worker threads for file scans (default 1)
 - Localhost HTML dashboard (`--dashboard`)
 - Path / finding allowlist (`.secret-scanner-ignore`) and inline `secret-scanner:ignore`
@@ -137,6 +137,7 @@ python main.py [path] [options]
 | `--changed` | Working tree vs `HEAD`, plus untracked files |
 | `--history` | Scan added lines in recent Git commits (not the working tree) |
 | `--history-depth N` | How many recent commits `--history` reads (default: 200, max 5000) |
+| `--since REF` | Files changed since REF (`git diff REF...HEAD`, not untracked) |
 | `--jobs N` / `-j N` | Worker threads for file scans (default: 1, `0` = CPU count, max 32) |
 | `--dashboard` | Localhost HTML dashboard (`127.0.0.1` only) |
 | `--port N` | Dashboard port (default: 8765) |
@@ -153,12 +154,14 @@ python main.py [path] [options]
 | `--config FILE` | JSON or YAML project config (default: `.secret-scanner.json` / `.yml`) |
 | `--version` | Print the version and exit |
 
-`--staged`, `--changed`, and `--history` are mutually exclusive. They require a
-Git repository and the `git` executable. After a clean CI checkout, staged and
-changed lists are empty — scan the committed tree (`python main.py .`) in
-pipelines. `--history` walks `git log -p` for the last N commits; deleting a
-file in HEAD does not hide the commit that introduced it. `--dashboard` cannot
-be combined with those Git flags, `--install-hook`, or `--update-baseline`.
+`--staged`, `--changed`, `--history`, and `--since` are mutually exclusive. They
+require a Git repository and the `git` executable. After a clean CI checkout,
+staged and changed lists are empty — scan the committed tree (`python main.py .`)
+in pipelines. `--history` walks `git log -p` for the last N commits; deleting a
+file in HEAD does not hide the commit that introduced it. `--since origin/main`
+scans only files in the PR delta (`origin/main...HEAD`); fetch the base ref
+first (`fetch-depth: 0`). `--dashboard` cannot be combined with those Git flags,
+`--install-hook`, or `--update-baseline`.
 
 ## CLI Examples
 
@@ -171,6 +174,7 @@ python main.py . --staged
 python main.py . --changed
 python main.py . --history
 python main.py . --history --history-depth 500
+python main.py . --since origin/main
 python main.py . --jobs 4
 python main.py --dashboard
 python main.py --dashboard --no-browser --port 8765
@@ -427,7 +431,7 @@ JavaScript. POST `/scan` requires the CSRF token from the form. The Host
 header must be loopback. Paths that look like URLs are rejected.
 
 The dashboard runs a working-tree scan (the same engine as `python main.py PATH`).
-Use the CLI for `--staged`, `--changed`, and `--history`. Do not expose this
+Use the CLI for `--staged`, `--changed`, `--history`, and `--since`. Do not expose this
 port on a network or reverse-proxy it to the internet.
 
 ```text
@@ -475,6 +479,17 @@ Example job for another project (stdlib only; no `pip` required to scan):
   run: python main.py . --no-color
 ```
 
+PR-only delta (does **not** replace a full-tree product scan; secrets in
+untouched files are missed). Fetch the base branch:
+
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
+- name: Secret scan (PR files)
+  run: python main.py . --no-color --since origin/${{ github.base_ref }}
+```
+
 A failing scan must not print live secrets into public Actions logs. This
 CLI already masks values.
 
@@ -486,7 +501,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-and history modes, parallel file scans, the localhost dashboard, the hook
+and history modes, `--since` deltas, parallel file scans, the localhost dashboard, the hook
 installer, project config files, custom patterns, SARIF and HTML reports, and
 the CI workflow file. All credentials in tests are fakes.
 
@@ -506,7 +521,9 @@ the CI workflow file. All credentials in tests are fakes.
 - Files larger than 5 MiB and skipped binaries are not scanned (false
   negatives by design, for performance).
 - `--staged` does not scan untracked files; `--changed` does not equal
-  “the whole repository”.
+  “the whole repository”. `--since REF` only lists `REF...HEAD`; a leak
+  that already sat on the base branch and was not edited is skipped.
+  Shallow clones without the base ref make `--since` exit 2.
 - Allowlist is path/finding-name based, plus same-line `secret-scanner:ignore`.
   An ignored path or line will not report a newly added live key. Baseline
   hashes a specific value in a file; it is not a substitute for rotation.
@@ -541,7 +558,7 @@ scanner/
   confidence.py         5–99 detection score
   severity.py           pattern → CRITICAL/HIGH/MEDIUM/LOW
   models.py             SecretFinding, ScanResult
-  git_mode.py           staged / changed file lists, history patch
+  git_mode.py           staged / changed / since file lists, history patch
   history.py            parse git log -p added lines
   ignore.py             path / finding allowlist and inline markers
   fingerprint.py        SHA-256 secret id (no plaintext)

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.12.0 — 2026-08-31
+
+### Added
+
+- `--since REF` scans files in `git diff REF...HEAD` (PR / branch delta)
+- Untracked files are not included; unknown refs exit 2
+- Mutually exclusive with `--staged`, `--changed`, and `--history`
+
 ## 1.11.0 — 2026-08-31
 
 ### Added

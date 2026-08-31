@@ -20,7 +20,14 @@ from scanner.baseline import (
 )
 from scanner.config_file import ConfigError, FileSettings, load_config_file, resolve_config_path
 from scanner.file_handler import MAX_JOBS, ScanConfig, resolve_jobs
-from scanner.git_mode import GitError, list_changed_files, list_staged_files, repo_root, restrict_to_target
+from scanner.git_mode import (
+    GitError,
+    list_changed_files,
+    list_since_files,
+    list_staged_files,
+    repo_root,
+    restrict_to_target,
+)
 from scanner.history import list_history_lines, path_in_target
 from scanner.hook import HookError, install_pre_commit_hook
 from scanner.ignore import IgnoreError, default_ignore_file, ignore_root, load_ignore_file
@@ -68,6 +75,7 @@ examples:
   python main.py . --staged
   python main.py . --changed
   python main.py . --history
+  python main.py . --since origin/main
   python main.py . --jobs 4
   python main.py --dashboard --no-browser
   python main.py --version
@@ -164,6 +172,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--history",
         action="store_true",
         help="Scan added lines in recent Git commits (not the working tree)",
+    )
+    git_group.add_argument(
+        "--since",
+        metavar="REF",
+        help="Scan files changed since REF (git diff REF...HEAD). Not untracked.",
     )
     parser.add_argument(
         "--history-depth",
@@ -521,9 +534,9 @@ def run(
                 file=sys.stderr,
             )
             return 2
-        if namespace.staged or namespace.changed or namespace.history:
+        if namespace.staged or namespace.changed or namespace.history or namespace.since:
             print(
-                "Error: --dashboard cannot be combined with --staged, --changed, or --history",
+                "Error: --dashboard cannot be combined with Git scan flags",
                 file=sys.stderr,
             )
             return 2
@@ -584,6 +597,11 @@ def run(
                 if path_in_target(item.relative_path, root, target.resolve())
             ]
             result = scanner.scan_history(scoped, target=target)
+        elif namespace.since:
+            root = repo_root(target)
+            git_files = list_since_files(root, namespace.since)
+            scoped = restrict_to_target(git_files, target.resolve())
+            result = scanner.scan_paths(scoped, target=target)
         elif namespace.staged or namespace.changed:
             root = repo_root(target)
             git_files = (

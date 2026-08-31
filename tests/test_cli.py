@@ -26,7 +26,7 @@ def test_version_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as caught:
         parser.parse_args(["--version"])
     assert caught.value.code == 0
-    assert "1.11.0" in capsys.readouterr().out
+    assert "1.12.0" in capsys.readouterr().out
 
 
 def test_staged_and_changed_are_exclusive() -> None:
@@ -39,6 +39,12 @@ def test_history_and_staged_are_exclusive() -> None:
     parser = build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args([".", "--history", "--staged"])
+
+
+def test_since_and_staged_are_exclusive() -> None:
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args([".", "--since", "HEAD", "--staged"])
 
 
 def test_resolve_target_prefers_path_option() -> None:
