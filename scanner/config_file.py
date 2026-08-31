@@ -51,7 +51,7 @@ _PATTERN_KEYS = frozenset(
         "value_group",
     }
 )
-_FORMATS = frozenset({"text", "json", "sarif"})
+_FORMATS = frozenset({"text", "json", "sarif", "html"})
 MAX_CUSTOM_PATTERNS = 32
 MAX_CUSTOM_REGEX_LENGTH = 512
 MAX_CUSTOM_NAME_LENGTH = 64
@@ -305,7 +305,7 @@ def settings_from_mapping(data: dict[str, object], *, base: Path) -> FileSetting
     if format_name is not None:
         folded = format_name.casefold()
         if folded not in _FORMATS:
-            raise ConfigError("Config format must be 'text', 'json', or 'sarif'.")
+            raise ConfigError("Config format must be 'text', 'json', 'sarif', or 'html'.")
         format_name = folded
     exclude = _string_list(data, "exclude")
     return FileSettings(

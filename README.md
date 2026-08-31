@@ -12,11 +12,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.6.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.7.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.6.0
+# Secret Scanner 1.7.0
 ```
 
 ## Why Secret Scanner?
@@ -36,7 +36,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Placeholder filtering (documentation dummies are dropped)
 - Shannon entropy as a supporting signal (not a standalone detector)
 - Severity (CRITICAL → LOW) and confidence (5–99)
-- Masked terminal output, JSON reports, and SARIF 2.1.0
+- Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes
 - Path / finding allowlist (`.secret-scanner-ignore`)
 - Hashed finding baseline (SHA-256, no plaintext)
@@ -132,8 +132,8 @@ python main.py [path] [options]
 | `--include-hidden` | Scan hidden directories such as `.github` (never `.git` / `.venv`) |
 | `--staged` | Only files in the Git index (`git diff --cached`) |
 | `--changed` | Working tree vs `HEAD`, plus untracked files |
-| `--format text\|json\|sarif` | Terminal text, JSON, or SARIF 2.1.0 under `reports/` |
-| `--output FILE` / `-o -` | Write JSON or SARIF to a file, or stdout |
+| `--format text\|json\|sarif\|html` | Terminal text, JSON, SARIF 2.1.0, or HTML under `reports/` |
+| `--output FILE` / `-o -` | Write JSON, SARIF, or HTML to a file, or stdout |
 | `--no-color` | Disable ANSI colors |
 | `--verbose` | DEBUG per-file lines in the log file |
 | `--ignore-file FILE` | Allowlist (default: `.secret-scanner-ignore` if present) |
@@ -162,6 +162,8 @@ python main.py . --output reports/latest.json
 python main.py . --format json -o -
 python main.py . --format sarif
 python main.py . --output reports/latest.sarif
+python main.py . --format html
+python main.py . --output reports/latest.html
 python main.py . --verbose --no-color
 python main.py --version
 python main.py . --ignore-file .secret-scanner-ignore
@@ -366,9 +368,24 @@ Upload example (does not replace the product-code scan job):
     sarif_file: reports/scan.sarif
 ```
 
+## HTML reports
+
+A self-contained page for humans (open the file in a browser). No CDN, no
+JavaScript, no source snippets. Paths, types, and masked values are
+HTML-escaped so a hostile filename cannot inject a script.
+
+```text
+python main.py . --format html
+python main.py . --output reports/latest.html
+```
+
+`reports/*.html` is gitignored. HTML is not a CI signal: exit codes still
+come from the scanner process. Do not email or publish a report if you
+are unsure it is masked; this tool only writes masked values.
+
 ## Security Considerations
 
-- Terminal, JSON, SARIF, and logs store **masked** values only. Logs record type,
+- Terminal, JSON, SARIF, HTML, and logs store **masked** values only. Logs record type,
   location, and severity — never the secret, not even masked.
 - Tests use fake/placeholder credentials, often split string literals, never
   live keys.
@@ -417,7 +434,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-mode, the hook installer, project config files, custom patterns, SARIF reports, and the CI workflow file. All credentials in tests are fakes.
+mode, the hook installer, project config files, custom patterns, SARIF and HTML reports, and the CI workflow file. All credentials in tests are fakes.
 
 ## Limitations
 
@@ -438,7 +455,7 @@ mode, the hook installer, project config files, custom patterns, SARIF reports, 
 - Custom regexes cannot replace built-in rules. A broad pattern will
   create noise; a regex that matches the empty string is rejected.
 - SARIF reports omit source snippets so GitHub Code Scanning cannot leak
-  the original line. HTML reports are not in this version.
+  the original line. HTML reports are escaped and also omit snippets.
 - Detection is never 100% accurate.
 
 ## Architecture
@@ -466,6 +483,7 @@ scanner/
 utils/logger.py         file logs, no secret values
 utils/reporter.py       masked JSON
 utils/sarif.py          SARIF 2.1.0 (no snippets)
+utils/html_report.py    self-contained HTML (escaped, no snippets)
 hooks/pre-commit         committed hook template
 tests/                  pytest
 .github/workflows/     CI
@@ -478,7 +496,6 @@ Runtime modules: `pathlib`, `re`, `json`, `argparse`, `logging`, `datetime`,
 
 Possible later work (not in the current tree):
 
-- HTML reports
 - Git history scanning
 - Parallel scanning
 - GUI / dashboard

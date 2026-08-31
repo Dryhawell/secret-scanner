@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.0 — 2026-08-31
+
+### Added
+
+- `--format html` self-contained report (no JS, no source snippets)
+- `--output file.html` infers HTML
+- HTML-escaped paths and values (XSS-safe for hostile filenames)
+
 ## 1.6.0 — 2026-08-31
 
 ### Added

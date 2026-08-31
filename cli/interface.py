@@ -1,6 +1,6 @@
 """Command-line interface for Secret Scanner.
 
-Text is the default surface. ``--format json`` / ``--format sarif`` write
+Text is the default surface. ``--format json`` / ``sarif`` / ``html`` write
 a timestamped file under ``reports/`` unless ``--output`` is given
 (``-o -`` prints the report to stdout).
 """
@@ -34,6 +34,7 @@ from scanner.severity import (
 )
 from scanner.version import __version__
 from utils.logger import get_logger, setup_logging
+from utils.html_report import render_html, write_html_report
 from utils.reporter import dumps_report, write_json_report
 from utils.sarif import dumps_sarif, write_sarif_report
 
@@ -59,6 +60,8 @@ examples:
   python main.py . --format json -o -
   python main.py . --format sarif
   python main.py . --output reports/latest.sarif
+  python main.py . --format html
+  python main.py . --output reports/latest.html
   python main.py . --verbose
   python main.py . --staged
   python main.py . --changed
@@ -124,16 +127,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--format",
-        choices=("text", "json", "sarif"),
+        choices=("text", "json", "sarif", "html"),
         default=None,
-        help="text (default), json, or sarif (writes reports/scan_* unless --output)",
+        help="text (default), json, sarif, or html (writes reports/scan_* unless --output)",
     )
     parser.add_argument(
         "--output",
         "-o",
         metavar="FILE",
-        help="Write JSON or SARIF to FILE (use - for stdout). Without --output, "
-        "--format json|sarif writes reports/scan_YYYY-MM-DD_HHMM.*",
+        help="Write JSON, SARIF, or HTML to FILE (use - for stdout). Without --output, "
+        "--format json|sarif|html writes reports/scan_YYYY-MM-DD_HHMM.*",
     )
     parser.add_argument(
         "--verbose",
@@ -342,7 +345,7 @@ def render_text(
 def resolve_output_format(
     namespace: argparse.Namespace, settings: FileSettings
 ) -> str:
-    """CLI --format wins. ``--output file.sarif`` infers sarif. ``--output`` still defaults to json."""
+    """CLI --format wins. ``--output file.sarif|.html`` infers format. ``--output`` still defaults to json."""
     if namespace.format:
         chosen = namespace.format
     elif settings.format:
@@ -353,8 +356,12 @@ def resolve_output_format(
         return chosen
     if namespace.format:
         return namespace.format
-    if namespace.output != "-" and Path(namespace.output).suffix.casefold() == ".sarif":
-        return "sarif"
+    if namespace.output != "-":
+        suffix = Path(namespace.output).suffix.casefold()
+        if suffix == ".sarif":
+            return "sarif"
+        if suffix == ".html":
+            return "html"
     return "json"
 
 
@@ -392,6 +399,28 @@ def emit_sarif(
         sys.stdout.write(dumps_sarif(result, findings, target))
         return None
     written = write_sarif_report(
+        result,
+        findings,
+        target,
+        output=Path(output) if output else None,
+        reports_dir=reports_dir or Path("reports"),
+    )
+    print(f"Report written: {written.as_posix()}")
+    return written
+
+
+def emit_html(
+    result: ScanResult,
+    target: Path,
+    findings: list[SecretFinding],
+    output: str | None,
+    reports_dir: Path | None = None,
+) -> Path | None:
+    """Write HTML to a file, or to stdout when output is '-'."""
+    if output == "-":
+        sys.stdout.write(render_html(result, findings, target))
+        return None
+    written = write_html_report(
         result,
         findings,
         target,
@@ -492,6 +521,8 @@ def run(
             emit_json(result, target, findings, namespace.output, reports_dir=reports_dir)
         elif format_name == "sarif":
             emit_sarif(result, target, findings, namespace.output, reports_dir=reports_dir)
+        elif format_name == "html":
+            emit_html(result, target, findings, namespace.output, reports_dir=reports_dir)
         else:
             render_text(result, target, findings, color=color)
     except OSError as exc:
