@@ -12,11 +12,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.3.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.4.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.3.0
+# Secret Scanner 1.4.0
 ```
 
 ## Why Secret Scanner?
@@ -41,6 +41,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Path / finding allowlist (`.secret-scanner-ignore`)
 - Hashed finding baseline (SHA-256, no plaintext)
 - Optional local Git pre-commit hook (`--install-hook`)
+- JSON / subset-YAML project config (`--config`)
 - File logging without secret values
 - Exit codes for CI (`0` clean, `1` findings, `2` error)
 
@@ -139,6 +140,7 @@ python main.py [path] [options]
 | `--update-baseline` | Merge current findings into the baseline and exit 0 |
 | `--install-hook` | Copy `hooks/pre-commit` into `.git/hooks/pre-commit` |
 | `--force-hook` | Overwrite an existing hook |
+| `--config FILE` | JSON or YAML project config (default: `.secret-scanner.json` / `.yml`) |
 | `--version` | Print the version and exit |
 
 `--staged` and `--changed` are mutually exclusive. They require a Git repository
@@ -163,6 +165,7 @@ python main.py . --ignore-file .secret-scanner-ignore
 python main.py . --update-baseline
 python main.py . --baseline .secret-scanner-baseline.json
 python main.py --install-hook
+python main.py . --config .secret-scanner.json
 ```
 
 ## Ignore rules
@@ -200,6 +203,34 @@ The file stores SHA-256 fingerprints plus a masked prefix — never the
 plaintext secret. The default filename is not scanned as source. Review
 findings before updating. Rotating a real credential is still required; the
 baseline only means “we already triaged this hash.”
+
+## Project config
+
+Commit a `.secret-scanner.json` (preferred) or `.secret-scanner.yml` next
+to the scan root. `--config FILE` must exist when given (exit `2` if missing).
+CLI flags override the file. Relative `ignore_file` / `baseline` paths are
+resolved from the config file's directory.
+
+JSON:
+
+```json
+{
+  "severity": "HIGH",
+  "exclude": ["dist", "build"],
+  "include_hidden": false,
+  "no_color": true,
+  "format": "text",
+  "ignore_file": ".secret-scanner-ignore",
+  "baseline": ".secret-scanner-baseline.json"
+}
+```
+
+YAML is a **restricted subset** (no PyYAML): `key: value`, booleans, `#`
+comments, and indented dash lists. Anchors, tags, and nested maps are
+rejected. Unknown keys fail the run (exit `2`). Custom regexes are not in
+this schema yet.
+
+Default config filenames are not scanned as source.
 
 ## Pre-commit hook
 
@@ -335,7 +366,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-mode, the hook installer, and the CI workflow file. All credentials in tests are fakes.
+mode, the hook installer, project config files, and the CI workflow file. All credentials in tests are fakes.
 
 ## Limitations
 
@@ -352,7 +383,9 @@ mode, the hook installer, and the CI workflow file. All credentials in tests are
   substitute for rotation.
 - The pre-commit hook is local and bypassable (`git commit --no-verify`).
   It is not a substitute for CI.
-- No YAML config, SARIF, or HTML report in this version.
+- YAML config is a documented subset, not a full YAML 1.1 parser. There is
+  no custom regex catalog in this version.
+- No SARIF or HTML report in this version.
 - Detection is never 100% accurate.
 
 ## Architecture
@@ -375,6 +408,7 @@ scanner/
   fingerprint.py        SHA-256 secret id (no plaintext)
   baseline.py           hashed finding baseline
   hook.py               copy template into .git/hooks
+  config_file.py        JSON / subset-YAML project config
   scanner.py            orchestration
 utils/logger.py         file logs, no secret values
 utils/reporter.py       masked JSON
@@ -390,7 +424,7 @@ Runtime modules: `pathlib`, `re`, `json`, `argparse`, `logging`, `datetime`,
 
 Possible later work (not in the current tree):
 
-- YAML configuration and custom regexes
+- Custom detection regexes
 - SARIF and HTML reports
 - Git history scanning
 - Parallel scanning

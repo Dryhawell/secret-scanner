@@ -69,7 +69,14 @@ DEFAULT_MAX_FILE_SIZE = 5 * 1024 * 1024
 
 # Hashed baseline JSON uses the key "fingerprint"; still skip the default
 # filename so a committed baseline is never scanned as source.
-_SKIP_FILENAMES = frozenset({".secret-scanner-baseline.json"})
+_SKIP_FILENAMES = frozenset(
+    {
+        ".secret-scanner-baseline.json",
+        ".secret-scanner.json",
+        ".secret-scanner.yml",
+        ".secret-scanner.yaml",
+    }
+)
 
 
 @dataclass

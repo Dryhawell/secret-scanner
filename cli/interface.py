@@ -17,6 +17,7 @@ from scanner.baseline import (
     load_baseline,
     write_baseline,
 )
+from scanner.config_file import ConfigError, FileSettings, load_config_file, resolve_config_path
 from scanner.file_handler import ScanConfig
 from scanner.git_mode import GitError, list_changed_files, list_staged_files, repo_root, restrict_to_target
 from scanner.hook import HookError, install_pre_commit_hook
@@ -61,6 +62,7 @@ examples:
   python main.py . --update-baseline
   python main.py . --baseline .secret-scanner-baseline.json
   python main.py --install-hook
+  python main.py . --config .secret-scanner.json
 """
 
 
@@ -95,8 +97,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--severity",
         choices=[item.value for item in Severity],
-        default=Severity.LOW.value,
-        help="Minimum severity to report (default: LOW = show all)",
+        default=None,
+        help="Minimum severity to report (default: LOW, or the config file)",
     )
     parser.add_argument(
         "--exclude",
@@ -118,7 +120,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--format",
         choices=("text", "json"),
-        default="text",
+        default=None,
         help="text (default) or json (writes reports/scan_*.json unless --output)",
     )
     parser.add_argument(
@@ -172,6 +174,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Overwrite an existing pre-commit hook (used with --install-hook)",
     )
+    parser.add_argument(
+        "--config",
+        metavar="FILE",
+        help="JSON or YAML config (default: .secret-scanner.json / .yml if present). "
+        "CLI flags override file values.",
+    )
     return parser
 
 
@@ -180,19 +188,35 @@ def resolve_target(namespace: argparse.Namespace) -> Path:
     return Path(raw)
 
 
-def build_scan_config(namespace: argparse.Namespace) -> ScanConfig:
-    config = ScanConfig(include_hidden=namespace.include_hidden)
-    for name in namespace.exclude:
+def build_scan_config(
+    namespace: argparse.Namespace, settings: FileSettings | None = None
+) -> ScanConfig:
+    hidden = namespace.include_hidden or (
+        settings.include_hidden is True if settings is not None else False
+    )
+    config = ScanConfig(include_hidden=hidden)
+    names: list[str] = []
+    if settings is not None:
+        names.extend(settings.exclude)
+    names.extend(namespace.exclude)
+    for name in names:
         config.exclude_dir(name)
     return config
 
 
 def apply_ignore_file(
-    config: ScanConfig, namespace: argparse.Namespace, target: Path
+    config: ScanConfig,
+    namespace: argparse.Namespace,
+    target: Path,
+    settings: FileSettings | None = None,
 ) -> None:
     """Load allowlist rules into ``config``. Missing default file is a no-op."""
     if namespace.ignore_file:
         path = Path(namespace.ignore_file)
+        if not path.is_file():
+            raise IgnoreError(f"Ignore file does not exist: {path}")
+    elif settings is not None and settings.ignore_file is not None:
+        path = settings.ignore_file
         if not path.is_file():
             raise IgnoreError(f"Ignore file does not exist: {path}")
     else:
@@ -206,13 +230,20 @@ def apply_ignore_file(
 
 
 def apply_baseline(
-    config: ScanConfig, namespace: argparse.Namespace, target: Path
+    config: ScanConfig,
+    namespace: argparse.Namespace,
+    target: Path,
+    settings: FileSettings | None = None,
 ) -> None:
     """Load baseline keys. Missing default file is a no-op. Skip on --update-baseline."""
     if namespace.update_baseline:
         return
     if namespace.baseline:
         path = Path(namespace.baseline)
+        if not path.is_file():
+            raise BaselineError(f"Baseline file does not exist: {path}")
+    elif settings is not None and settings.baseline is not None:
+        path = settings.baseline
         if not path.is_file():
             raise BaselineError(f"Baseline file does not exist: {path}")
     else:
@@ -223,10 +254,16 @@ def apply_baseline(
     config.baseline_keys.update(load_baseline(path))
 
 
-def resolve_baseline_path(namespace: argparse.Namespace, target: Path) -> Path:
+def resolve_baseline_path(
+    namespace: argparse.Namespace,
+    target: Path,
+    settings: FileSettings | None = None,
+) -> Path:
     """Path used by --update-baseline."""
     if namespace.baseline:
         return Path(namespace.baseline)
+    if settings is not None and settings.baseline is not None:
+        return settings.baseline
     found = default_baseline_file(target)
     if found is not None:
         return found
@@ -328,8 +365,6 @@ def run(
     parser = build_parser()
     namespace = parser.parse_args(argv)
     target = resolve_target(namespace)
-    minimum = Severity(namespace.severity)
-    color = _use_color(namespace.no_color)
     setup_logging(log_file=log_file, verbose=namespace.verbose)
 
     if not target.exists():
@@ -349,10 +384,25 @@ def run(
         print(f"Installed pre-commit hook: {dest.as_posix()}")
         return 0
 
-    scanner = Scanner(config=build_scan_config(namespace))
     try:
-        apply_ignore_file(scanner.config, namespace, target)
-        apply_baseline(scanner.config, namespace, target)
+        config_path = resolve_config_path(namespace.config, target)
+        settings = (
+            load_config_file(config_path) if config_path is not None else FileSettings()
+        )
+    except ConfigError as exc:
+        get_logger().error("%s", exc)
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    verbose = namespace.verbose or (settings.verbose is True)
+    setup_logging(log_file=log_file, verbose=verbose)
+    minimum = Severity(namespace.severity or settings.severity or Severity.LOW.value)
+    color = _use_color(namespace.no_color or (settings.no_color is True))
+
+    scanner = Scanner(config=build_scan_config(namespace, settings))
+    try:
+        apply_ignore_file(scanner.config, namespace, target, settings)
+        apply_baseline(scanner.config, namespace, target, settings)
         if namespace.staged or namespace.changed:
             root = repo_root(target)
             git_files = (
@@ -386,7 +436,7 @@ def run(
         location_of=lambda item: item.location(root=target),
     )
 
-    format_name = namespace.format
+    format_name = namespace.format or settings.format or "text"
     if namespace.output:
         format_name = "json"
 
@@ -403,7 +453,7 @@ def run(
     if namespace.update_baseline:
         try:
             written = write_baseline(
-                resolve_baseline_path(namespace, target),
+                resolve_baseline_path(namespace, target, settings),
                 result.findings,
                 ignore_root(target),
             )

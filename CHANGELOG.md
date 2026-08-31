@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.0 — 2026-08-31
+
+### Added
+
+- `.secret-scanner.json` / `.yml` project config (`--config`)
+- Restricted YAML subset parser (stdlib only; no PyYAML)
+- Config keys: `severity`, `exclude`, `include_hidden`, `no_color`, `verbose`,
+  `format`, `ignore_file`, `baseline`
+- CLI flags override file values; unknown keys exit 2
+
 ## 1.3.0 — 2026-08-29
 
 ### Added
