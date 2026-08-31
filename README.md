@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.9.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.10.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.9.0
+# Secret Scanner 1.10.0
 ```
 
 ## Why Secret Scanner?
@@ -40,6 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, plus `--history` for recent commits
 - `--jobs` worker threads for file scans (default 1)
+- Localhost HTML dashboard (`--dashboard`)
 - Path / finding allowlist (`.secret-scanner-ignore`)
 - Hashed finding baseline (SHA-256, no plaintext)
 - Optional local Git pre-commit hook (`--install-hook`)
@@ -137,6 +138,9 @@ python main.py [path] [options]
 | `--history` | Scan added lines in recent Git commits (not the working tree) |
 | `--history-depth N` | How many recent commits `--history` reads (default: 200, max 5000) |
 | `--jobs N` / `-j N` | Worker threads for file scans (default: 1, `0` = CPU count, max 32) |
+| `--dashboard` | Localhost HTML dashboard (`127.0.0.1` only) |
+| `--port N` | Dashboard port (default: 8765) |
+| `--no-browser` | Do not open a browser when the dashboard starts |
 | `--format text\|json\|sarif\|html` | Terminal text, JSON, SARIF 2.1.0, or HTML under `reports/` |
 | `--output FILE` / `-o -` | Write JSON, SARIF, or HTML to a file, or stdout |
 | `--no-color` | Disable ANSI colors |
@@ -153,7 +157,8 @@ python main.py [path] [options]
 Git repository and the `git` executable. After a clean CI checkout, staged and
 changed lists are empty — scan the committed tree (`python main.py .`) in
 pipelines. `--history` walks `git log -p` for the last N commits; deleting a
-file in HEAD does not hide the commit that introduced it.
+file in HEAD does not hide the commit that introduced it. `--dashboard` cannot
+be combined with those Git flags, `--install-hook`, or `--update-baseline`.
 
 ## CLI Examples
 
@@ -167,6 +172,8 @@ python main.py . --changed
 python main.py . --history
 python main.py . --history --history-depth 500
 python main.py . --jobs 4
+python main.py --dashboard
+python main.py --dashboard --no-browser --port 8765
 python main.py . --format json
 python main.py . --output reports/latest.json
 python main.py . --format json -o -
@@ -395,9 +402,25 @@ python main.py . --output reports/latest.html
 come from the scanner process. Do not email or publish a report if you
 are unsure it is masked; this tool only writes masked values.
 
+## Dashboard
+
+`python main.py --dashboard` serves a **localhost-only** HTML form at
+`http://127.0.0.1:8765/`. It is not bound on `0.0.0.0`. There is no
+JavaScript. POST `/scan` requires the CSRF token from the form. The Host
+header must be loopback. Paths that look like URLs are rejected.
+
+The dashboard runs a working-tree scan (the same engine as `python main.py PATH`).
+Use the CLI for `--staged`, `--changed`, and `--history`. Do not expose this
+port on a network or reverse-proxy it to the internet.
+
+```text
+python main.py --dashboard
+python main.py --dashboard --no-browser --port 8765
+```
+
 ## Security Considerations
 
-- Terminal, JSON, SARIF, HTML, and logs store **masked** values only. Logs record type,
+- Terminal, JSON, SARIF, HTML, dashboard, and logs store **masked** values only. Logs record type,
   location, and severity — never the secret, not even masked.
 - Tests use fake/placeholder credentials, often split string literals, never
   live keys.
@@ -446,9 +469,9 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-and history modes, parallel file scans, the hook installer, project config
-files, custom patterns, SARIF and HTML reports, and the CI workflow file. All
-credentials in tests are fakes.
+and history modes, parallel file scans, the localhost dashboard, the hook
+installer, project config files, custom patterns, SARIF and HTML reports, and
+the CI workflow file. All credentials in tests are fakes.
 
 ## Limitations
 
@@ -482,12 +505,15 @@ credentials in tests are fakes.
   help. Default is 1 (same as a sequential scan). `--history` stays
   single-threaded.
 - Detection is never 100% accurate.
+- `--dashboard` is a local helper, not a multi-user app. It does not scan
+  Git history. Binding is loopback-only; do not publish the port.
 
 ## Architecture
 
 ```text
 main.py                 entry point (exit code from cli)
 cli/interface.py        argparse, text/JSON output, Git flags
+cli/dashboard.py        localhost HTML dashboard (127.0.0.1)
 scanner/
   file_handler.py       discovery, excludes, binary/size caps
   patterns.py           compiled regex catalog (plus config custom patterns)
@@ -516,14 +542,13 @@ tests/                  pytest
 ```
 
 Runtime modules: `pathlib`, `re`, `json`, `argparse`, `logging`, `datetime`,
-`dataclasses`, `subprocess` (Git), `hashlib`, `concurrent.futures`. No network
-calls.
+`dataclasses`, `subprocess` (Git), `hashlib`, `concurrent.futures`,
+`http.server` (dashboard, 127.0.0.1 only). No outbound network calls.
 
 ## Roadmap
 
-Possible later work (not in the current tree):
-
-- GUI / dashboard
+The original feature list for this tree is implemented. Later work would be
+new product ideas, not a listed gap.
 
 ## Authorized / Responsible Use
 

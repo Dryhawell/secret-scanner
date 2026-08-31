@@ -34,6 +34,7 @@ from scanner.severity import (
     sort_findings,
 )
 from scanner.version import __version__
+from cli.dashboard import DEFAULT_PORT, serve_dashboard
 from utils.logger import get_logger, setup_logging
 from utils.html_report import render_html, write_html_report
 from utils.reporter import dumps_report, write_json_report
@@ -68,6 +69,7 @@ examples:
   python main.py . --changed
   python main.py . --history
   python main.py . --jobs 4
+  python main.py --dashboard --no-browser
   python main.py --version
   python main.py . --ignore-file .secret-scanner-ignore
   python main.py . --update-baseline
@@ -180,6 +182,23 @@ def build_parser() -> argparse.ArgumentParser:
         "Does not apply to --history.",
     )
     parser.add_argument(
+        "--dashboard",
+        action="store_true",
+        help="Serve a localhost-only HTML dashboard (127.0.0.1, no JavaScript)",
+    )
+    parser.add_argument(
+        "--port",
+        type=_parse_port,
+        default=DEFAULT_PORT,
+        metavar="N",
+        help="Dashboard listen port (default: 8765). Bound to 127.0.0.1 only.",
+    )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Do not open a browser when --dashboard starts",
+    )
+    parser.add_argument(
         "--ignore-file",
         metavar="FILE",
         help="Allowlist file (default: .secret-scanner-ignore next to the "
@@ -225,6 +244,16 @@ def _parse_jobs(raw: str) -> int:
         raise argparse.ArgumentTypeError(
             f"jobs must be between 0 and {MAX_JOBS} (0 = auto)"
         )
+    return value
+
+
+def _parse_port(raw: str) -> int:
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("port must be an integer") from exc
+    if value < 1 or value > 65535:
+        raise argparse.ArgumentTypeError("port must be between 1 and 65535")
     return value
 
 
@@ -484,6 +513,26 @@ def run(
     namespace = parser.parse_args(argv)
     target = resolve_target(namespace)
     setup_logging(log_file=log_file, verbose=namespace.verbose)
+
+    if namespace.dashboard:
+        if namespace.install_hook or namespace.update_baseline:
+            print(
+                "Error: --dashboard cannot be combined with --install-hook or --update-baseline",
+                file=sys.stderr,
+            )
+            return 2
+        if namespace.staged or namespace.changed or namespace.history:
+            print(
+                "Error: --dashboard cannot be combined with --staged, --changed, or --history",
+                file=sys.stderr,
+            )
+            return 2
+        default_path = target if target.exists() else Path(".")
+        return serve_dashboard(
+            namespace,
+            default_path=default_path,
+            open_browser=not namespace.no_browser,
+        )
 
     if not target.exists():
         get_logger().error("Target does not exist: %s", target)

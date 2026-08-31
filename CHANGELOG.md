@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.10.0 — 2026-08-31
+
+### Added
+
+- `--dashboard` localhost HTML UI (`127.0.0.1` only, no JavaScript)
+- `--port` (default 8765) and `--no-browser`
+- CSRF token on POST /scan; Host must be loopback
+- Working-tree scans from the form; CLI Git flags stay exclusive
+
 ## 1.9.0 — 2026-08-31
 
 ### Added

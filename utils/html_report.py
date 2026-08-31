@@ -27,12 +27,47 @@ def _e(value: object) -> str:
     return escape(str(value), quote=True)
 
 
-def render_html(
+PAGE_CSS = """:root { color-scheme: dark; }
+body { font: 15px/1.45 system-ui, sans-serif; margin: 0; background: #0f1419;
+  color: #e7ecf1; }
+main { max-width: 960px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+h1 { font-size: 1.4rem; margin: 0 0 0.25rem; }
+.meta { color: #8b9bb0; margin-bottom: 1.5rem; }
+.cards { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0 0 1.5rem; }
+.card { background: #1a2330; border-radius: 8px; padding: 0.7rem 0.9rem; min-width: 7rem; }
+.card strong { display: block; font-size: 1.15rem; }
+.card span { color: #8b9bb0; font-size: 0.8rem; }
+table { width: 100%; border-collapse: collapse; background: #1a2330;
+  border-radius: 8px; overflow: hidden; }
+th, td { text-align: left; padding: 0.65rem 0.75rem; vertical-align: top; }
+th { color: #8b9bb0; font-weight: 600; font-size: 0.8rem; }
+tr + tr td { border-top: 1px solid #243044; }
+code { font-family: ui-monospace, monospace; font-size: 0.9em; }
+.pill { display: inline-block; padding: 0.12rem 0.45rem; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; }
+.critical { background: #5c1520; color: #ff8b96; }
+.high { background: #5a3b12; color: #ffc56e; }
+.medium { background: #143a45; color: #7ee0f2; }
+.low { background: #2a3340; color: #c5d0dc; }
+.empty { color: #8b9bb0; }
+.note { margin-top: 1.25rem; color: #8b9bb0; font-size: 0.85rem; }
+form { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: end;
+  margin: 0 0 1.5rem; }
+label { display: block; color: #8b9bb0; font-size: 0.8rem; margin-bottom: 0.25rem; }
+input[type=text] { background: #1a2330; color: #e7ecf1; border: 1px solid #243044;
+  border-radius: 8px; padding: 0.55rem 0.7rem; min-width: 22rem; }
+button { background: #2a6f97; color: #fff; border: 0; border-radius: 8px;
+  padding: 0.55rem 0.9rem; font-weight: 600; cursor: pointer; }
+.error { color: #ff8b96; margin: 0 0 1rem; }
+"""
+
+
+def render_findings_block(
     result: ScanResult,
     findings: list[SecretFinding],
     target: Path,
 ) -> str:
-    """Return a full HTML document. Never includes plaintext secrets."""
+    """Cards plus findings table. Never includes plaintext secrets."""
     counts = count_by_severity(findings)
     rows = [_finding_row(item, target) for item in findings]
     body = (
@@ -40,44 +75,7 @@ def render_html(
         if rows
         else '<tr><td colspan="5" class="empty">No potential secrets found.</td></tr>'
     )
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Secret Scanner report</title>
-<style>
-:root {{ color-scheme: dark; }}
-body {{ font: 15px/1.45 system-ui, sans-serif; margin: 0; background: #0f1419;
-  color: #e7ecf1; }}
-main {{ max-width: 960px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }}
-h1 {{ font-size: 1.4rem; margin: 0 0 0.25rem; }}
-.meta {{ color: #8b9bb0; margin-bottom: 1.5rem; }}
-.cards {{ display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0 0 1.5rem; }}
-.card {{ background: #1a2330; border-radius: 8px; padding: 0.7rem 0.9rem; min-width: 7rem; }}
-.card strong {{ display: block; font-size: 1.15rem; }}
-.card span {{ color: #8b9bb0; font-size: 0.8rem; }}
-table {{ width: 100%; border-collapse: collapse; background: #1a2330;
-  border-radius: 8px; overflow: hidden; }}
-th, td {{ text-align: left; padding: 0.65rem 0.75rem; vertical-align: top; }}
-th {{ color: #8b9bb0; font-weight: 600; font-size: 0.8rem; }}
-tr + tr td {{ border-top: 1px solid #243044; }}
-code {{ font-family: ui-monospace, monospace; font-size: 0.9em; }}
-.pill {{ display: inline-block; padding: 0.12rem 0.45rem; border-radius: 999px;
-  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; }}
-.critical {{ background: #5c1520; color: #ff8b96; }}
-.high {{ background: #5a3b12; color: #ffc56e; }}
-.medium {{ background: #143a45; color: #7ee0f2; }}
-.low {{ background: #2a3340; color: #c5d0dc; }}
-.empty {{ color: #8b9bb0; }}
-.note {{ margin-top: 1.25rem; color: #8b9bb0; font-size: 0.85rem; }}
-</style>
-</head>
-<body>
-<main>
-<h1>Secret Scanner {_e(__version__)}</h1>
-<p class="meta">Target: {_e(target)} · Scan time: {_e(result.scan_time.isoformat())}</p>
-<div class="cards">
+    return f"""<div class="cards">
   <div class="card"><strong>{result.files_scanned}</strong><span>Files</span></div>
   <div class="card"><strong>{result.lines_scanned}</strong><span>Lines</span></div>
   <div class="card"><strong>{len(findings)}</strong><span>Findings</span></div>
@@ -94,7 +92,30 @@ code {{ font-family: ui-monospace, monospace; font-size: 0.9em; }}
 <tbody>
 {body}
 </tbody>
-</table>
+</table>"""
+
+
+def render_html(
+    result: ScanResult,
+    findings: list[SecretFinding],
+    target: Path,
+) -> str:
+    """Return a full HTML document. Never includes plaintext secrets."""
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secret Scanner report</title>
+<style>
+{PAGE_CSS}
+</style>
+</head>
+<body>
+<main>
+<h1>Secret Scanner {_e(__version__)}</h1>
+<p class="meta">Target: {_e(target)} · Scan time: {_e(result.scan_time.isoformat())}</p>
+{render_findings_block(result, findings, target)}
 <p class="note">Values are masked. This report does not include source snippets
 or plaintext secrets. Finding a real credential still requires revoke and rotate.</p>
 </main>
