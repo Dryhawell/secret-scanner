@@ -16,6 +16,8 @@ _LOG = get_logger()
 
 DEFAULT_IGNORE_NAME = ".secret-scanner-ignore"
 _FINDING_SEP = " | "
+INLINE_MARKER = "secret-scanner:ignore"
+INLINE_ALL = "*"
 
 
 class IgnoreError(Exception):
@@ -153,3 +155,31 @@ def is_ignored_finding(
         if matches_path(relative, location):
             return True
     return False
+
+
+def inline_ignore_spec(line: str) -> str | None:
+    """Return how an inline marker applies, or ``None`` if absent.
+
+    ``INLINE_ALL`` means every finding on the line. Any other string is a
+    pattern name (compared case-insensitively). The marker does not hide
+    findings on other lines.
+    """
+    folded = line.casefold()
+    pos = folded.find(INLINE_MARKER)
+    if pos < 0:
+        return None
+    rest = line[pos + len(INLINE_MARKER) :].strip()
+    rest = rest.split("#", 1)[0].strip()
+    if not rest:
+        return INLINE_ALL
+    return rest
+
+
+def is_inline_ignored(line: str, pattern_name: str) -> bool:
+    """True if this line's marker suppresses ``pattern_name``."""
+    spec = inline_ignore_spec(line)
+    if spec is None:
+        return False
+    if spec == INLINE_ALL:
+        return True
+    return spec.casefold() == pattern_name.casefold()

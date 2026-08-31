@@ -5,8 +5,11 @@ from pathlib import Path
 from cli.interface import run
 from scanner.file_handler import ScanConfig
 from scanner.ignore import (
+    INLINE_ALL,
+    inline_ignore_spec,
     is_ignored_finding,
     is_ignored_path,
+    is_inline_ignored,
     matches_path,
     parse_ignore_text,
 )
@@ -103,4 +106,81 @@ def test_missing_explicit_ignore_file_exits_two(tmp_path: Path) -> None:
             reports_dir=tmp_path / "reports",
         )
         == 2
+    )
+
+
+def test_inline_ignore_spec_all_and_typed() -> None:
+    assert inline_ignore_spec("print('ok')") is None
+    assert inline_ignore_spec("x = 1  # secret-scanner:ignore") == INLINE_ALL
+    assert (
+        inline_ignore_spec("x = 1  # secret-scanner:ignore AWS Access Key ID")
+        == "AWS Access Key ID"
+    )
+    assert is_inline_ignored("x  # secret-scanner:ignore", "AWS Access Key ID")
+    assert is_inline_ignored(
+        "x  # secret-scanner:ignore AWS Access Key ID", "AWS Access Key ID"
+    )
+    assert not is_inline_ignored(
+        "x  # secret-scanner:ignore AWS Access Key ID", "GitHub Token"
+    )
+
+
+def test_inline_ignore_counts_as_allowlist(tmp_path: Path) -> None:
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    (tmp_path / "app.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'  # secret-scanner:ignore\n",
+        encoding="utf-8",
+    )
+    result = Scanner().scan(tmp_path)
+    assert result.findings_count == 0
+    assert result.allowlist_ignored >= 1
+
+
+def test_cli_inline_ignore_drops_same_line_only(tmp_path: Path) -> None:
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    (tmp_path / "app.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'  # secret-scanner:ignore\n"
+        "print('ok')\n",
+        encoding="utf-8",
+    )
+    assert (
+        run(
+            ["--no-color", str(tmp_path)],
+            log_file=tmp_path / "cli.log",
+            reports_dir=tmp_path / "reports",
+        )
+        == 0
+    )
+
+
+def test_cli_typed_inline_ignore_keeps_other_types(tmp_path: Path) -> None:
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    (tmp_path / "app.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'  # secret-scanner:ignore Generic Password\n",
+        encoding="utf-8",
+    )
+    assert (
+        run(
+            ["--no-color", str(tmp_path)],
+            log_file=tmp_path / "cli.log",
+            reports_dir=tmp_path / "reports",
+        )
+        == 1
+    )
+
+
+def test_inline_ignore_does_not_affect_next_line(tmp_path: Path) -> None:
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    (tmp_path / "app.py").write_text(
+        "# secret-scanner:ignore\n"
+        f"AWS_ACCESS_KEY_ID = '{aws}'\n",
+        encoding="utf-8",
+    )
+    assert (
+        run(
+            ["--no-color", str(tmp_path)],
+            log_file=tmp_path / "cli.log",
+            reports_dir=tmp_path / "reports",
+        )
+        == 1
     )

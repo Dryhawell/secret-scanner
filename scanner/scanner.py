@@ -112,10 +112,11 @@ class Scanner:
             seen_units.add(unit)
             files_seen.add((item.commit, item.relative_path))
             lines_scanned += 1
-            line_findings, line_ignored = self.detector.scan_line(
+            line_findings, line_ignored, line_inline = self.detector.scan_line(
                 item.text, path, item.line_number, commit=item.commit
             )
             placeholders_ignored += line_ignored
+            allowlist_ignored += line_inline
             for finding in line_findings:
                 if is_ignored_finding(
                     finding.file_path,
@@ -179,6 +180,7 @@ class Scanner:
         for path, file_scan in zip(files, scans, strict=True):
             lines_scanned += file_scan.lines_scanned
             placeholders_ignored += file_scan.placeholders_ignored
+            allowlist_ignored += file_scan.inline_ignored
             for finding in file_scan.findings:
                 if is_ignored_finding(
                     finding.file_path,

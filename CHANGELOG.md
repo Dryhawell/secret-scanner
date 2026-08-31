@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.11.0 — 2026-08-31
+
+### Added
+
+- Inline `secret-scanner:ignore` on the same line drops findings (counted as allowlist)
+- Optional pattern name: `secret-scanner:ignore AWS Access Key ID`
+- Marker does not apply to other lines
+
 ## 1.10.0 — 2026-08-31
 
 ### Added

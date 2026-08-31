@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.10.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.11.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.10.0
+# Secret Scanner 1.11.0
 ```
 
 ## Why Secret Scanner?
@@ -41,7 +41,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - `--staged` / `--changed` Git modes, plus `--history` for recent commits
 - `--jobs` worker threads for file scans (default 1)
 - Localhost HTML dashboard (`--dashboard`)
-- Path / finding allowlist (`.secret-scanner-ignore`)
+- Path / finding allowlist (`.secret-scanner-ignore`) and inline `secret-scanner:ignore`
 - Hashed finding baseline (SHA-256, no plaintext)
 - Optional local Git pre-commit hook (`--install-hook`)
 - JSON / subset-YAML project config (`--config`)
@@ -209,6 +209,23 @@ scanner/detector.py | Contextual Secret
 `--ignore-file` must exist when given (exit `2` if missing). Without the flag,
 the scanner loads `.secret-scanner-ignore` next to the target, or from the
 current directory when that directory is a parent of the target.
+
+### Inline ignore
+
+Put `secret-scanner:ignore` on the **same line** as a known false positive.
+That line's findings are dropped and counted under allowlist. Other lines
+in the file are unchanged.
+
+```text
+# Same line as the assignment (not the line above):
+#     ...  # secret-scanner:ignore
+#     ...  # secret-scanner:ignore AWS Access Key ID
+```
+
+A typed marker (`secret-scanner:ignore AWS Access Key ID`) drops only that
+pattern on that line. A live credential on an ignored line is also hidden —
+same risk as a path allowlist. Prefer rotating real secrets; do not use
+inline ignore to keep a live key in source.
 
 ## Baseline
 
@@ -490,9 +507,9 @@ the CI workflow file. All credentials in tests are fakes.
   negatives by design, for performance).
 - `--staged` does not scan untracked files; `--changed` does not equal
   “the whole repository”.
-- Allowlist is path/finding-name based. An ignored path will not report a newly
-  added live key. Baseline hashes a specific value in a file; it is not a
-  substitute for rotation.
+- Allowlist is path/finding-name based, plus same-line `secret-scanner:ignore`.
+  An ignored path or line will not report a newly added live key. Baseline
+  hashes a specific value in a file; it is not a substitute for rotation.
 - The pre-commit hook is local and bypassable (`git commit --no-verify`).
   It is not a substitute for CI.
 - YAML config is a documented subset, not a full YAML 1.1 parser.
@@ -526,7 +543,7 @@ scanner/
   models.py             SecretFinding, ScanResult
   git_mode.py           staged / changed file lists, history patch
   history.py            parse git log -p added lines
-  ignore.py             path / finding allowlist
+  ignore.py             path / finding allowlist and inline markers
   fingerprint.py        SHA-256 secret id (no plaintext)
   baseline.py           hashed finding baseline
   hook.py               copy template into .git/hooks

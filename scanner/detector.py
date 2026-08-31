@@ -16,6 +16,7 @@ from scanner.context import CONTEXTUAL_PATTERN_NAME, find_context_hits
 from scanner.entropy import ENTROPY_GATED_PATTERNS, is_low_entropy
 from scanner.filters import is_placeholder
 from scanner.fingerprint import secret_id
+from scanner.ignore import is_inline_ignored
 from scanner.models import SecretFinding
 from scanner.patterns import PatternEngine
 from scanner.severity import severity_for
@@ -54,6 +55,7 @@ class FileScan:
     findings: tuple[SecretFinding, ...]
     lines_scanned: int
     placeholders_ignored: int = 0
+    inline_ignored: int = 0
 
 
 class Detector:
@@ -69,10 +71,10 @@ class Detector:
 
     def scan_line(
         self, line: str, file_path: Path, line_number: int, *, commit: str = ""
-    ) -> tuple[list[SecretFinding], int]:
-        """Return (findings, placeholders_ignored) for one line."""
+    ) -> tuple[list[SecretFinding], int, int]:
+        """Return (findings, placeholders_ignored, inline_ignored) for one line."""
         if len(line) > self.max_line_length:
-            return [], 0
+            return [], 0, 0
 
         findings: list[SecretFinding] = []
         ignored = 0
@@ -136,22 +138,31 @@ class Detector:
                     commit=commit,
                 )
             )
-        return findings, ignored
+        kept: list[SecretFinding] = []
+        inline_ignored = 0
+        for finding in findings:
+            if is_inline_ignored(line, finding.pattern_name):
+                inline_ignored += 1
+                continue
+            kept.append(finding)
+        return kept, ignored, inline_ignored
 
     def scan_file(self, path: Path) -> FileScan:
         """Read ``path`` line by line. Unreadable files yield an empty result."""
         findings: list[SecretFinding] = []
         lines_scanned = 0
         ignored = 0
+        inline_ignored = 0
         try:
             with path.open("r", encoding="utf-8", errors="replace") as handle:
                 for line_number, line in enumerate(handle, start=1):
                     lines_scanned = line_number
-                    line_findings, line_ignored = self.scan_line(
+                    line_findings, line_ignored, line_inline = self.scan_line(
                         line.rstrip("\n"), path, line_number
                     )
                     findings.extend(line_findings)
                     ignored += line_ignored
+                    inline_ignored += line_inline
         except OSError as exc:
             _LOG.error("Unable to read file %s: %s", path, exc.strerror or exc)
             return FileScan(findings=(), lines_scanned=0, placeholders_ignored=0)
@@ -169,4 +180,5 @@ class Detector:
             findings=tuple(findings),
             lines_scanned=lines_scanned,
             placeholders_ignored=ignored,
+            inline_ignored=inline_ignored,
         )
