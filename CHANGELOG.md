@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.13.0 — 2026-08-31
+
+### Added
+
+- Built-in formats: GitLab (`glpat-`), Slack (`xoxb-` / …), npm, Hugging Face (`hf_`),
+  OpenAI (`sk-`, not Stripe `sk_`), PyPI (`pypi-`)
+- New vendor rules are format-locked (entropy does not drop them)
+
 ## 1.12.0 — 2026-08-31
 
 ### Added

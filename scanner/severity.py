@@ -40,6 +40,12 @@ PATTERN_SEVERITY: dict[str, Severity] = {
     "JWT": Severity.HIGH,
     "Generic API Key": Severity.HIGH,
     "Database Connection String": Severity.HIGH,
+    "GitLab Token": Severity.HIGH,
+    "Slack Token": Severity.HIGH,
+    "npm Token": Severity.HIGH,
+    "Hugging Face Token": Severity.HIGH,
+    "OpenAI API Key": Severity.HIGH,
+    "PyPI Token": Severity.HIGH,
     # MEDIUM: likely credentials, but often placeholders or local secrets.
     "Generic Password": Severity.MEDIUM,
     # MEDIUM: variable name is sensitive, value has no known vendor format.

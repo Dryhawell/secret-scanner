@@ -30,6 +30,12 @@ FORMAT_LOCKED_PATTERNS: frozenset[str] = frozenset(
         "Stripe API Key",
         "JWT",
         "Database Connection String",
+        "GitLab Token",
+        "Slack Token",
+        "npm Token",
+        "Hugging Face Token",
+        "OpenAI API Key",
+        "PyPI Token",
     }
 )
 

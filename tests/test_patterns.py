@@ -113,10 +113,52 @@ def test_http_url_is_not_a_database_string() -> None:
     )
 
 
+def test_gitlab_token_matches_fake_format() -> None:
+    fake = "glpat-" + "TESTPLACEHOLDER00000"
+    assert len(fake) == 6 + 20
+    assert "GitLab Token" in _match_names(fake)
+    assert "GitLab Token" not in _match_names("glpat-short")
+
+
+def test_slack_token_matches_fake_format() -> None:
+    fake = "xoxb-" + "0000000000-TESTFAKE00"
+    assert "Slack Token" in _match_names(fake)
+    assert "Slack Token" not in _match_names("xoxb-short")
+
+
+def test_npm_token_matches_fake_format() -> None:
+    fake = "npm_" + ("A" * 36)
+    assert "npm Token" in _match_names(fake)
+    assert "npm Token" not in _match_names("npm_SHORT")
+
+
+def test_hugging_face_token_matches_fake_format() -> None:
+    fake = "hf_" + ("B" * 34)
+    assert "Hugging Face Token" in _match_names(fake)
+    assert "Hugging Face Token" not in _match_names("hf_short")
+
+
+def test_openai_key_is_not_stripe() -> None:
+    fake = "sk-" + "TESTOPENAIPLACEHOLDER00"
+    names = _match_names(fake)
+    assert "OpenAI API Key" in names
+    assert "Stripe API Key" not in names
+    stripe = "sk_test_" + "TESTPLACEHOLDER000000"
+    names = _match_names(stripe)
+    assert "Stripe API Key" in names
+    assert "OpenAI API Key" not in names
+
+
+def test_pypi_token_matches_fake_format() -> None:
+    fake = "pypi-" + ("C" * 32)
+    assert "PyPI Token" in _match_names(fake)
+    assert "PyPI Token" not in _match_names("pypi-short")
+
+
 def test_default_catalog_is_non_empty_and_named() -> None:
     patterns = default_patterns()
     names = [pattern.name for pattern in patterns]
     assert len(patterns) >= 8
     assert len(names) == len(set(names))
-    assert "AWS Access Key ID" in names
-    assert "Private Key" in names
+    assert "GitLab Token" in names
+    assert "OpenAI API Key" in names

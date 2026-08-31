@@ -87,6 +87,42 @@ def default_patterns() -> list[SecretPattern]:
             description="Database URLs often embed username and password in the scheme://user:pass@host form.",
             flags=re.IGNORECASE,
         ),
+        SecretPattern(
+            name="GitLab Token",
+            regex=r"(?<![A-Za-z0-9])glpat-[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])",
+            severity=severity_for("GitLab Token"),
+            description="GitLab personal access tokens start with glpat- and a long payload.",
+        ),
+        SecretPattern(
+            name="Slack Token",
+            regex=r"(?<![A-Za-z0-9])xox[baprs]-[0-9A-Za-z-]{10,}",
+            severity=severity_for("Slack Token"),
+            description="Slack bot and user tokens use xoxb-, xoxp-, xoxa-, xoxr-, or xoxs- prefixes.",
+        ),
+        SecretPattern(
+            name="npm Token",
+            regex=r"(?<![A-Za-z0-9])npm_[A-Za-z0-9]{36}(?![A-Za-z0-9])",
+            severity=severity_for("npm Token"),
+            description="npm access tokens start with npm_ followed by 36 alphanumeric characters.",
+        ),
+        SecretPattern(
+            name="Hugging Face Token",
+            regex=r"(?<![A-Za-z0-9])hf_[A-Za-z0-9]{34,}(?![A-Za-z0-9])",
+            severity=severity_for("Hugging Face Token"),
+            description="Hugging Face access tokens start with hf_ and a long alphanumeric payload.",
+        ),
+        SecretPattern(
+            name="OpenAI API Key",
+            regex=r"(?<![A-Za-z0-9])sk-[A-Za-z0-9-]{20,}(?![A-Za-z0-9-])",
+            severity=severity_for("OpenAI API Key"),
+            description="OpenAI keys use sk- (hyphen). Stripe live/test keys use sk_ and are a different rule.",
+        ),
+        SecretPattern(
+            name="PyPI Token",
+            regex=r"(?<![A-Za-z0-9])pypi-[A-Za-z0-9_-]{32,}(?![A-Za-z0-9_-])",
+            severity=severity_for("PyPI Token"),
+            description="PyPI API tokens start with pypi- and a long payload.",
+        ),
     ]
 
 

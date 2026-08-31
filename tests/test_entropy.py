@@ -51,3 +51,13 @@ def test_low_entropy_token_assignment_is_dropped(tmp_path) -> None:
     file_scan = Detector().scan_file(target)
     assert file_scan.findings == ()
     assert file_scan.placeholders_ignored >= 1
+
+
+def test_every_builtin_pattern_has_entropy_policy() -> None:
+    from scanner.entropy import ENTROPY_GATED_PATTERNS, FORMAT_LOCKED_PATTERNS
+    from scanner.patterns import default_patterns
+
+    names = {item.name for item in default_patterns()}
+    covered = FORMAT_LOCKED_PATTERNS | ENTROPY_GATED_PATTERNS
+    assert names <= covered
+    assert FORMAT_LOCKED_PATTERNS.isdisjoint(ENTROPY_GATED_PATTERNS)

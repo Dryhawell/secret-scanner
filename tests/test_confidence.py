@@ -61,3 +61,12 @@ def test_detector_sets_confidence(tmp_path) -> None:
     aws_hits = [item for item in findings if item.pattern_name == "AWS Access Key ID"]
     assert len(aws_hits) == 1
     assert MIN_CONFIDENCE <= aws_hits[0].confidence <= MAX_CONFIDENCE
+
+
+def test_every_builtin_pattern_has_confidence_base() -> None:
+    from scanner.confidence import PATTERN_BASE
+    from scanner.context import CONTEXTUAL_PATTERN_NAME
+    from scanner.patterns import default_patterns
+
+    names = {item.name for item in default_patterns()} | {CONTEXTUAL_PATTERN_NAME}
+    assert names <= set(PATTERN_BASE)

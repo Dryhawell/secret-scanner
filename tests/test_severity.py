@@ -45,6 +45,8 @@ def test_cloud_and_private_key_are_critical() -> None:
 
 def test_tokens_and_api_keys_are_high() -> None:
     assert severity_for("GitHub Token") is Severity.HIGH
+    assert severity_for("GitLab Token") is Severity.HIGH
+    assert severity_for("OpenAI API Key") is Severity.HIGH
     assert severity_for("Generic API Key") is Severity.HIGH
     assert severity_for("Database Connection String") is Severity.HIGH
     assert severity_for("JWT") is Severity.HIGH

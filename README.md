@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.12.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.13.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.12.0
+# Secret Scanner 1.13.0
 ```
 
 ## Why Secret Scanner?
@@ -57,8 +57,8 @@ The pipeline is **pattern + context + placeholder filter + entropy (gated)**.
    extensions, files over 5 MiB, and lines longer than 100 000 characters.
    Hidden *directories* (`.github`) are skipped unless `--include-hidden`.
    Hidden *files* such as `.env` are still scanned.
-2. **Format patterns** — public prefixes and shapes (`AKIA…`, `ghp_`, PEM
-   headers, JWTs, Stripe keys, database URLs, …).
+2. **Format patterns** — public prefixes and shapes (`AKIA…`, `ghp_`, `glpat-`,
+   `xoxb-`, `npm_`, `hf_`, `sk-`, PEM headers, JWTs, Stripe `sk_live_`, …).
 3. **Context** — sensitive names (`password`, `token`, `api_key`, …) with a
    long-enough value that has no vendor prefix.
 4. **Placeholder filter** — `YOUR_API_KEY`, `changeme`, `example`, and similar
@@ -85,6 +85,12 @@ clamped to 5–99.
 | GitHub Fine-Grained Token (`github_pat_`) | HIGH |
 | Google API Key | HIGH |
 | Stripe API Key | HIGH |
+| GitLab Token (`glpat-`) | HIGH |
+| Slack Token (`xoxb-` / `xoxp-` / …) | HIGH |
+| npm Token (`npm_`) | HIGH |
+| Hugging Face Token (`hf_`) | HIGH |
+| OpenAI API Key (`sk-`, not Stripe `sk_`) | HIGH |
+| PyPI Token (`pypi-`) | HIGH |
 | JWT | HIGH |
 | Generic API Key assignment | HIGH |
 | Database connection string | HIGH |

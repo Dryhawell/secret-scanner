@@ -4,4 +4,4 @@ from scanner.version import __version__
 
 
 def test_version_is_semver() -> None:
-    assert __version__ == "1.12.0"
+    assert __version__ == "1.13.0"
