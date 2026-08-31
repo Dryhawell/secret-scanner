@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.0 — 2026-08-31
+
+### Added
+
+- `--format sarif` (SARIF 2.1.0) for GitHub Code Scanning
+- `--output file.sarif` infers SARIF
+- Reports omit source snippets and plaintext secrets
+
 ## 1.5.0 — 2026-08-31
 
 ### Added

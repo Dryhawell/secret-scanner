@@ -12,11 +12,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.5.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.6.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.5.0
+# Secret Scanner 1.6.0
 ```
 
 ## Why Secret Scanner?
@@ -36,7 +36,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Placeholder filtering (documentation dummies are dropped)
 - Shannon entropy as a supporting signal (not a standalone detector)
 - Severity (CRITICAL → LOW) and confidence (5–99)
-- Masked terminal output and JSON reports
+- Masked terminal output, JSON reports, and SARIF 2.1.0
 - `--staged` / `--changed` Git modes
 - Path / finding allowlist (`.secret-scanner-ignore`)
 - Hashed finding baseline (SHA-256, no plaintext)
@@ -132,8 +132,8 @@ python main.py [path] [options]
 | `--include-hidden` | Scan hidden directories such as `.github` (never `.git` / `.venv`) |
 | `--staged` | Only files in the Git index (`git diff --cached`) |
 | `--changed` | Working tree vs `HEAD`, plus untracked files |
-| `--format text\|json` | Terminal text, or JSON under `reports/` |
-| `--output FILE` / `-o -` | Write JSON to a file, or stdout |
+| `--format text\|json\|sarif` | Terminal text, JSON, or SARIF 2.1.0 under `reports/` |
+| `--output FILE` / `-o -` | Write JSON or SARIF to a file, or stdout |
 | `--no-color` | Disable ANSI colors |
 | `--verbose` | DEBUG per-file lines in the log file |
 | `--ignore-file FILE` | Allowlist (default: `.secret-scanner-ignore` if present) |
@@ -160,6 +160,8 @@ python main.py . --changed
 python main.py . --format json
 python main.py . --output reports/latest.json
 python main.py . --format json -o -
+python main.py . --format sarif
+python main.py . --output reports/latest.sarif
 python main.py . --verbose --no-color
 python main.py --version
 python main.py . --ignore-file .secret-scanner-ignore
@@ -313,7 +315,7 @@ python main.py . --format json
 ```
 
 `reports/*.json` is gitignored so a scan of your own tree cannot commit
-findings. Payload shape (no plaintext `value` field):
+findings. `reports/*.sarif` is gitignored the same way. Payload shape (no plaintext `value` field):
 
 ```json
 {
@@ -339,9 +341,34 @@ findings. Payload shape (no plaintext `value` field):
 }
 ```
 
+## SARIF reports
+
+SARIF 2.1.0 is what GitHub Code Scanning (and many IDEs) ingest.
+
+```text
+python main.py . --format sarif
+python main.py . --output reports/latest.sarif
+```
+
+`reports/*.sarif` is gitignored. The document has **no source snippets**
+and no plaintext secret: a snippet would copy the original line into the
+code scanning API. Messages use the masked value. `partialFingerprints`
+store the SHA-256 finding id, not the secret.
+
+Upload example (does not replace the product-code scan job):
+
+```yaml
+- name: Secret scan (SARIF)
+  run: python main.py . --no-color --format sarif --output reports/scan.sarif
+- name: Upload SARIF
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: reports/scan.sarif
+```
+
 ## Security Considerations
 
-- Terminal, JSON, and logs store **masked** values only. Logs record type,
+- Terminal, JSON, SARIF, and logs store **masked** values only. Logs record type,
   location, and severity — never the secret, not even masked.
 - Tests use fake/placeholder credentials, often split string literals, never
   live keys.
@@ -390,7 +417,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-mode, the hook installer, project config files, custom patterns, and the CI workflow file. All credentials in tests are fakes.
+mode, the hook installer, project config files, custom patterns, SARIF reports, and the CI workflow file. All credentials in tests are fakes.
 
 ## Limitations
 
@@ -410,7 +437,8 @@ mode, the hook installer, project config files, custom patterns, and the CI work
 - YAML config is a documented subset, not a full YAML 1.1 parser.
 - Custom regexes cannot replace built-in rules. A broad pattern will
   create noise; a regex that matches the empty string is rejected.
-- No SARIF or HTML report in this version.
+- SARIF reports omit source snippets so GitHub Code Scanning cannot leak
+  the original line. HTML reports are not in this version.
 - Detection is never 100% accurate.
 
 ## Architecture
@@ -437,6 +465,7 @@ scanner/
   scanner.py            orchestration
 utils/logger.py         file logs, no secret values
 utils/reporter.py       masked JSON
+utils/sarif.py          SARIF 2.1.0 (no snippets)
 hooks/pre-commit         committed hook template
 tests/                  pytest
 .github/workflows/     CI
@@ -449,7 +478,7 @@ Runtime modules: `pathlib`, `re`, `json`, `argparse`, `logging`, `datetime`,
 
 Possible later work (not in the current tree):
 
-- SARIF and HTML reports
+- HTML reports
 - Git history scanning
 - Parallel scanning
 - GUI / dashboard

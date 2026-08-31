@@ -1,7 +1,8 @@
 """Command-line interface for Secret Scanner.
 
-Text is the default surface. ``--format json`` writes a timestamped file
-under ``reports/`` unless ``--output`` is given (``-o -`` prints JSON to stdout).
+Text is the default surface. ``--format json`` / ``--format sarif`` write
+a timestamped file under ``reports/`` unless ``--output`` is given
+(``-o -`` prints the report to stdout).
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ from scanner.severity import (
 from scanner.version import __version__
 from utils.logger import get_logger, setup_logging
 from utils.reporter import dumps_report, write_json_report
+from utils.sarif import dumps_sarif, write_sarif_report
 
 _RESET = "\033[0m"
 _BOLD = "\033[1m"
@@ -55,6 +57,8 @@ examples:
   python main.py . --format json
   python main.py . --output reports/latest.json
   python main.py . --format json -o -
+  python main.py . --format sarif
+  python main.py . --output reports/latest.sarif
   python main.py . --verbose
   python main.py . --staged
   python main.py . --changed
@@ -120,16 +124,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--format",
-        choices=("text", "json"),
+        choices=("text", "json", "sarif"),
         default=None,
-        help="text (default) or json (writes reports/scan_*.json unless --output)",
+        help="text (default), json, or sarif (writes reports/scan_* unless --output)",
     )
     parser.add_argument(
         "--output",
         "-o",
         metavar="FILE",
-        help="Write JSON to FILE (use - for stdout). Without --output, "
-        "--format json writes reports/scan_YYYY-MM-DD_HHMM.json",
+        help="Write JSON or SARIF to FILE (use - for stdout). Without --output, "
+        "--format json|sarif writes reports/scan_YYYY-MM-DD_HHMM.*",
     )
     parser.add_argument(
         "--verbose",
@@ -335,6 +339,25 @@ def render_text(
     print("Scan completed.")
 
 
+def resolve_output_format(
+    namespace: argparse.Namespace, settings: FileSettings
+) -> str:
+    """CLI --format wins. ``--output file.sarif`` infers sarif. ``--output`` still defaults to json."""
+    if namespace.format:
+        chosen = namespace.format
+    elif settings.format:
+        chosen = settings.format
+    else:
+        chosen = "text"
+    if not namespace.output:
+        return chosen
+    if namespace.format:
+        return namespace.format
+    if namespace.output != "-" and Path(namespace.output).suffix.casefold() == ".sarif":
+        return "sarif"
+    return "json"
+
+
 def emit_json(
     result: ScanResult,
     target: Path,
@@ -347,6 +370,28 @@ def emit_json(
         sys.stdout.write(dumps_report(result, findings, target))
         return None
     written = write_json_report(
+        result,
+        findings,
+        target,
+        output=Path(output) if output else None,
+        reports_dir=reports_dir or Path("reports"),
+    )
+    print(f"Report written: {written.as_posix()}")
+    return written
+
+
+def emit_sarif(
+    result: ScanResult,
+    target: Path,
+    findings: list[SecretFinding],
+    output: str | None,
+    reports_dir: Path | None = None,
+) -> Path | None:
+    """Write SARIF to a file, or to stdout when output is '-'."""
+    if output == "-":
+        sys.stdout.write(dumps_sarif(result, findings, target))
+        return None
+    written = write_sarif_report(
         result,
         findings,
         target,
@@ -440,13 +485,13 @@ def run(
         location_of=lambda item: item.location(root=target),
     )
 
-    format_name = namespace.format or settings.format or "text"
-    if namespace.output:
-        format_name = "json"
+    format_name = resolve_output_format(namespace, settings)
 
     try:
         if format_name == "json":
             emit_json(result, target, findings, namespace.output, reports_dir=reports_dir)
+        elif format_name == "sarif":
+            emit_sarif(result, target, findings, namespace.output, reports_dir=reports_dir)
         else:
             render_text(result, target, findings, color=color)
     except OSError as exc:

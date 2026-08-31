@@ -18,13 +18,16 @@ DEFAULT_REPORTS_DIR = Path("reports")
 def default_report_path(
     when: datetime,
     directory: Path = DEFAULT_REPORTS_DIR,
+    suffix: str = ".json",
 ) -> Path:
-    """Return ``reports/scan_YYYY-MM-DD_HHMM.json`` (seconds if that file exists)."""
+    """Return ``reports/scan_YYYY-MM-DD_HHMM{suffix}`` (seconds if that file exists)."""
     directory = Path(directory)
-    stamped = directory / f"scan_{when.strftime('%Y-%m-%d_%H%M')}.json"
+    if not suffix.startswith("."):
+        suffix = f".{suffix}"
+    stamped = directory / f"scan_{when.strftime('%Y-%m-%d_%H%M')}{suffix}"
     if not stamped.exists():
         return stamped
-    return directory / f"scan_{when.strftime('%Y-%m-%d_%H%M%S')}.json"
+    return directory / f"scan_{when.strftime('%Y-%m-%d_%H%M%S')}{suffix}"
 
 
 def build_payload(
