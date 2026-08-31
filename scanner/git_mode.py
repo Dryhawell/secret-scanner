@@ -1,8 +1,9 @@
-"""Git-aware file lists (staged / changed). No hooks are installed here.
+"""Git-aware file lists (staged / changed) and history patches.
 
 Uses the ``git`` executable via subprocess, not a Git library. Paths are
 relative to the repository root and then resolved. Deleted files are omitted
-(``--diff-filter`` keeps Added / Copied / Modified / Renamed).
+from staged/changed lists (``--diff-filter`` keeps Added / Copied / Modified /
+Renamed). History mode still sees the commit that *introduced* a secret.
 """
 
 from __future__ import annotations
@@ -22,7 +23,9 @@ class GitError(Exception):
     """Raised when git is missing or the target is not a repository."""
 
 
-def _run_git(root: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
+def _run_git(
+    root: Path, args: list[str], *, timeout: int | None = None
+) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(
             ["git", *args],
@@ -32,7 +35,7 @@ def _run_git(root: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
             encoding="utf-8",
             errors="replace",
             check=False,
-            timeout=_GIT_TIMEOUT_SECONDS,
+            timeout=timeout or _GIT_TIMEOUT_SECONDS,
         )
     except FileNotFoundError as exc:
         raise GitError(
@@ -122,6 +125,32 @@ def list_changed_files(root: Path) -> list[Path]:
         unique.append(path)
     _LOG.info("Git changed files: %s", len(unique))
     return unique
+
+
+_HISTORY_GIT_TIMEOUT_SECONDS = 120
+_COMMIT_PRETTY = "===COMMIT %H==="
+
+
+def git_history_patch(root: Path, max_count: int) -> str:
+    """Return ``git log -p`` text for the most recent ``max_count`` commits."""
+    result = _run_git(
+        root,
+        [
+            "log",
+            "--all",
+            f"--max-count={max_count}",
+            f"--diff-filter={_DIFF_FILTER}",
+            f"--pretty=tformat:{_COMMIT_PRETTY}",
+            "--patch",
+            "--no-color",
+            "--text",
+        ],
+        timeout=_HISTORY_GIT_TIMEOUT_SECONDS,
+    )
+    if result.returncode != 0:
+        raise GitError(result.stderr.strip() or "git log failed")
+    _LOG.info("Git history patch bytes: %s (max-count=%s)", len(result.stdout), max_count)
+    return result.stdout
 
 
 def restrict_to_target(paths: list[Path], target: Path) -> list[Path]:

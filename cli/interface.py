@@ -21,6 +21,7 @@ from scanner.baseline import (
 from scanner.config_file import ConfigError, FileSettings, load_config_file, resolve_config_path
 from scanner.file_handler import ScanConfig
 from scanner.git_mode import GitError, list_changed_files, list_staged_files, repo_root, restrict_to_target
+from scanner.history import list_history_lines, path_in_target
 from scanner.hook import HookError, install_pre_commit_hook
 from scanner.ignore import IgnoreError, default_ignore_file, ignore_root, load_ignore_file
 from scanner.models import ScanResult, SecretFinding, Severity
@@ -65,6 +66,7 @@ examples:
   python main.py . --verbose
   python main.py . --staged
   python main.py . --changed
+  python main.py . --history
   python main.py --version
   python main.py . --ignore-file .secret-scanner-ignore
   python main.py . --update-baseline
@@ -154,6 +156,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--changed",
         action="store_true",
         help="Scan files changed vs HEAD plus untracked files",
+    )
+    git_group.add_argument(
+        "--history",
+        action="store_true",
+        help="Scan added lines in recent Git commits (not the working tree)",
+    )
+    parser.add_argument(
+        "--history-depth",
+        type=int,
+        default=200,
+        metavar="N",
+        help="How many recent commits --history reads (default: 200, max 5000)",
     )
     parser.add_argument(
         "--ignore-file",
@@ -481,7 +495,18 @@ def run(
     try:
         apply_ignore_file(scanner.config, namespace, target, settings)
         apply_baseline(scanner.config, namespace, target, settings)
-        if namespace.staged or namespace.changed:
+        if namespace.history:
+            if namespace.history_depth < 1 or namespace.history_depth > 5000:
+                raise GitError("history depth must be between 1 and 5000")
+            root = repo_root(target)
+            rows = list_history_lines(root, namespace.history_depth)
+            scoped = [
+                item
+                for item in rows
+                if path_in_target(item.relative_path, root, target.resolve())
+            ]
+            result = scanner.scan_history(scoped, target=target)
+        elif namespace.staged or namespace.changed:
             root = repo_root(target)
             git_files = (
                 list_staged_files(root)

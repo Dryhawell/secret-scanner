@@ -47,6 +47,24 @@ def test_finding_to_dict_has_no_plaintext_field(tmp_path: Path) -> None:
     payload = finding.to_dict(root=tmp_path)
     assert "matched_text" not in payload
     assert "fingerprint" in payload
+    assert payload["commit"] == ""
+    assert payload["file_path"] == "config.py"
     assert payload["masked_value"] == "AKIA****************"
     assert payload["line_number"] == 3
+
+
+def test_history_location_prefixes_commit(tmp_path: Path) -> None:
+    finding = SecretFinding(
+        file_path=tmp_path / "leak.py",
+        line_number=2,
+        secret_type="AWS Access Key ID",
+        severity=Severity.CRITICAL,
+        masked_value="AKIA****************",
+        description="test",
+        pattern_name="AWS Access Key ID",
+        commit="abcdef0123456789abcdef0123456789abcdef01",
+    )
+    assert finding.location(root=tmp_path) == "abcdef012345:leak.py:2"
+    assert finding.display_path(tmp_path) == "leak.py"
+
 

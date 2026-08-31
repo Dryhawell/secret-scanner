@@ -1,3 +1,3 @@
 """Package version. Import this module, not the full scanner package, for --version."""
 
-__version__ = "1.7.0"
+__version__ = "1.8.0"

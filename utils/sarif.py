@@ -54,7 +54,7 @@ def build_sarif(
         rid = rule_id(finding.pattern_name)
         if rid not in rules:
             rules[rid] = _rule(finding, rid)
-        uri = finding.location(root=target).rsplit(":", 1)[0]
+        uri = finding.display_path(target)
         results.append(
             {
                 "ruleId": rid,
@@ -80,6 +80,7 @@ def build_sarif(
                     "severity": finding.severity.value,
                     "confidence": finding.confidence,
                     "maskedValue": finding.masked_value,
+                    "commit": finding.commit,
                 },
             }
         )

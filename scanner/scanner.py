@@ -8,7 +8,8 @@ from pathlib import Path
 
 from scanner.baseline import is_baselined
 from scanner.detector import Detector
-from scanner.file_handler import ScanConfig, iter_scan_files, should_scan_file
+from scanner.file_handler import ScanConfig, has_excluded_extension, iter_scan_files, should_scan_file
+from scanner.history import HistoryLine
 from scanner.ignore import ignore_root, is_ignored_finding, is_ignored_path
 from scanner.models import ScanResult, SecretFinding
 from scanner.patterns import PatternEngine
@@ -75,6 +76,72 @@ class Scanner:
         files = self.discover_files(root)
         _LOG.info("Discovered %s candidate file(s)", len(files))
         return self._scan_file_list(files, target=root, started_at=started_at)
+
+    def scan_history(self, lines: Sequence[HistoryLine], *, target: Path) -> ScanResult:
+        """Scan added lines from Git history. Files need not exist on disk."""
+        started_at = datetime.now(timezone.utc)
+        _LOG.info("Scan started (git history): %s", target)
+        findings: list[SecretFinding] = []
+        lines_scanned = 0
+        placeholders_ignored = 0
+        allowlist_ignored = 0
+        baseline_ignored = 0
+        root = ignore_root(target)
+        skip_names = {".secret-scanner-baseline.json", ".secret-scanner.json",
+                      ".secret-scanner.yml", ".secret-scanner.yaml"}
+        seen_units: set[tuple[str, str, int]] = set()
+        files_seen: set[tuple[str, str]] = set()
+        for item in lines:
+            if item.relative_path.rsplit("/", 1)[-1].casefold() in skip_names:
+                continue
+            path = root / item.relative_path
+            if has_excluded_extension(path, self.config):
+                continue
+            if is_ignored_path(path, root, self.config.ignore_paths):
+                continue
+            unit = (item.commit, item.relative_path, item.line_number)
+            if unit in seen_units:
+                continue
+            seen_units.add(unit)
+            files_seen.add((item.commit, item.relative_path))
+            lines_scanned += 1
+            line_findings, line_ignored = self.detector.scan_line(
+                item.text, path, item.line_number, commit=item.commit
+            )
+            placeholders_ignored += line_ignored
+            for finding in line_findings:
+                if is_ignored_finding(
+                    finding.file_path,
+                    finding.pattern_name,
+                    root,
+                    self.config.ignore_findings,
+                ):
+                    allowlist_ignored += 1
+                    continue
+                if is_baselined(finding, root, self.config.baseline_keys):
+                    baseline_ignored += 1
+                    continue
+                findings.append(finding)
+        finished_at = datetime.now(timezone.utc)
+        _LOG.info(
+            "History scan completed: files=%s lines=%s findings=%s",
+            len(files_seen),
+            lines_scanned,
+            len(findings),
+        )
+        resolved = target.expanduser()
+        resolved = resolved.resolve() if resolved.exists() else resolved
+        return ScanResult(
+            target=resolved,
+            started_at=started_at,
+            finished_at=finished_at,
+            files_scanned=len(files_seen),
+            lines_scanned=lines_scanned,
+            findings=tuple(findings),
+            placeholders_ignored=placeholders_ignored,
+            allowlist_ignored=allowlist_ignored,
+            baseline_ignored=baseline_ignored,
+        )
 
     def _scan_file_list(
         self,

@@ -2,9 +2,10 @@
 
 [![CI](https://github.com/Dryhawell/secret-scanner/actions/workflows/ci.yml/badge.svg)](https://github.com/Dryhawell/secret-scanner/actions/workflows/ci.yml)
 
-A defensive Python CLI that scans a project directory (and Git staged/changed
-files) for accidentally committed secrets: API keys, tokens, passwords,
-private keys, cloud credentials, JWTs, and generic high-entropy assignments.
+A defensive Python CLI that scans a project directory, Git staged/changed
+files, and recent Git history for accidentally committed secrets: API keys,
+tokens, passwords, private keys, cloud credentials, JWTs, and generic
+high-entropy assignments.
 
 Built for **secret leakage prevention**. It is not an offensive security tool
 and it is not a secret manager.
@@ -12,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.7.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.8.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.7.0
+# Secret Scanner 1.8.0
 ```
 
 ## Why Secret Scanner?
@@ -37,7 +38,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Shannon entropy as a supporting signal (not a standalone detector)
 - Severity (CRITICAL → LOW) and confidence (5–99)
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
-- `--staged` / `--changed` Git modes
+- `--staged` / `--changed` Git modes, plus `--history` for recent commits
 - Path / finding allowlist (`.secret-scanner-ignore`)
 - Hashed finding baseline (SHA-256, no plaintext)
 - Optional local Git pre-commit hook (`--install-hook`)
@@ -132,6 +133,8 @@ python main.py [path] [options]
 | `--include-hidden` | Scan hidden directories such as `.github` (never `.git` / `.venv`) |
 | `--staged` | Only files in the Git index (`git diff --cached`) |
 | `--changed` | Working tree vs `HEAD`, plus untracked files |
+| `--history` | Scan added lines in recent Git commits (not the working tree) |
+| `--history-depth N` | How many recent commits `--history` reads (default: 200, max 5000) |
 | `--format text\|json\|sarif\|html` | Terminal text, JSON, SARIF 2.1.0, or HTML under `reports/` |
 | `--output FILE` / `-o -` | Write JSON, SARIF, or HTML to a file, or stdout |
 | `--no-color` | Disable ANSI colors |
@@ -144,9 +147,11 @@ python main.py [path] [options]
 | `--config FILE` | JSON or YAML project config (default: `.secret-scanner.json` / `.yml`) |
 | `--version` | Print the version and exit |
 
-`--staged` and `--changed` are mutually exclusive. They require a Git repository
-and the `git` executable. After a clean CI checkout, both lists are empty —
-scan the committed tree (`python main.py .`) in pipelines.
+`--staged`, `--changed`, and `--history` are mutually exclusive. They require a
+Git repository and the `git` executable. After a clean CI checkout, staged and
+changed lists are empty — scan the committed tree (`python main.py .`) in
+pipelines. `--history` walks `git log -p` for the last N commits; deleting a
+file in HEAD does not hide the commit that introduced it.
 
 ## CLI Examples
 
@@ -157,6 +162,8 @@ python main.py . --severity HIGH
 python main.py . --exclude dist --exclude build
 python main.py . --staged
 python main.py . --changed
+python main.py . --history
+python main.py . --history --history-depth 500
 python main.py . --format json
 python main.py . --output reports/latest.json
 python main.py . --format json -o -
@@ -434,14 +441,23 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-mode, the hook installer, project config files, custom patterns, SARIF and HTML reports, and the CI workflow file. All credentials in tests are fakes.
+and history modes, the hook installer, project config files, custom patterns,
+SARIF and HTML reports, and the CI workflow file. All credentials in tests
+are fakes.
 
 ## Limitations
 
 - Regex cannot know every secret format. New vendors will be missed until a
   pattern is added.
-- Secrets split across lines, encoded, or stored only in Git history are out
-  of scope for this version.
+- Secrets split across lines or encoded (base64 without a known prefix) are
+  still missed. `--history` only sees **added** (`+`) lines in `git log -p`
+  for the last `--history-depth` commits (newest first). A leak older than
+  that window is a false negative.
+- `--history` is not a history rewriter. Finding a secret in a commit means
+  **rotate** the credential. `git filter-repo` / force-push is incident
+  response, not a scanner feature.
+- Merge commits often have an empty default patch; a blob introduced only in
+  a merge may be missed.
 - Files larger than 5 MiB and skipped binaries are not scanned (false
   negatives by design, for performance).
 - `--staged` does not scan untracked files; `--changed` does not equal
@@ -473,7 +489,8 @@ scanner/
   confidence.py         5–99 detection score
   severity.py           pattern → CRITICAL/HIGH/MEDIUM/LOW
   models.py             SecretFinding, ScanResult
-  git_mode.py           staged / changed file lists
+  git_mode.py           staged / changed file lists, history patch
+  history.py            parse git log -p added lines
   ignore.py             path / finding allowlist
   fingerprint.py        SHA-256 secret id (no plaintext)
   baseline.py           hashed finding baseline
@@ -496,7 +513,6 @@ Runtime modules: `pathlib`, `re`, `json`, `argparse`, `logging`, `datetime`,
 
 Possible later work (not in the current tree):
 
-- Git history scanning
 - Parallel scanning
 - GUI / dashboard
 

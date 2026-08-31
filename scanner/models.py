@@ -65,22 +65,30 @@ class SecretFinding:
     timestamp: datetime = field(default_factory=_utc_now)
     confidence: int = 0
     fingerprint: str = ""
+    commit: str = ""
 
-    def location(self, root: Path | None = None) -> str:
-        """Return ``path:line`` in GitHub-style form, using forward slashes."""
+    def display_path(self, root: Path | None = None) -> str:
+        """Return a posix path, relative to ``root`` when possible."""
         path = self.file_path
         if root is not None:
             try:
                 path = path.resolve().relative_to(root.expanduser().resolve())
             except ValueError:
                 pass
-        return f"{path.as_posix()}:{self.line_number}"
+        return path.as_posix()
+
+    def location(self, root: Path | None = None) -> str:
+        """Return ``path:line``, or ``commit:path:line`` in history mode."""
+        path = self.display_path(root)
+        if self.commit:
+            return f"{self.commit[:12]}:{path}:{self.line_number}"
+        return f"{path}:{self.line_number}"
 
     def to_dict(self, root: Path | None = None) -> dict[str, object]:
         """JSON-safe view. Never includes the plaintext secret."""
         return {
             "file_path": (
-                self.location(root).rsplit(":", 1)[0] if root is not None else self.file_path.as_posix()
+                self.display_path(root) if root is not None else self.file_path.as_posix()
             ),
             "line_number": self.line_number,
             "secret_type": self.secret_type,
@@ -90,6 +98,7 @@ class SecretFinding:
             "description": self.description,
             "pattern_name": self.pattern_name,
             "fingerprint": self.fingerprint,
+            "commit": self.commit,
             "timestamp": self.timestamp.isoformat(),
         }
 

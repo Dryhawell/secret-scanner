@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.8.0 — 2026-08-31
+
+### Added
+
+- `--history` scans added lines in recent Git commits (`git log -p`)
+- `--history-depth` (default 200, max 5000)
+- Findings include a `commit` field; location is `sha:path:line`
+- Does not rewrite history; rotate leaked credentials
+
 ## 1.7.0 — 2026-08-31
 
 ### Added

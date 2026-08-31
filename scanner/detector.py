@@ -68,7 +68,7 @@ class Detector:
         self.max_line_length = max_line_length
 
     def scan_line(
-        self, line: str, file_path: Path, line_number: int
+        self, line: str, file_path: Path, line_number: int, *, commit: str = ""
     ) -> tuple[list[SecretFinding], int]:
         """Return (findings, placeholders_ignored) for one line."""
         if len(line) > self.max_line_length:
@@ -103,6 +103,7 @@ class Detector:
                         match.pattern_name, match.matched_text, line
                     ),
                     fingerprint=secret_id(match.pattern_name, match.matched_text),
+                    commit=commit,
                 )
             )
 
@@ -132,6 +133,7 @@ class Detector:
                         CONTEXTUAL_PATTERN_NAME, hit.value, line
                     ),
                     fingerprint=secret_id(CONTEXTUAL_PATTERN_NAME, hit.value),
+                    commit=commit,
                 )
             )
         return findings, ignored
