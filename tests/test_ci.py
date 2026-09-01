@@ -9,7 +9,9 @@ def test_ci_workflow_exists_and_runs_pytest() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
     assert WORKFLOW.is_file()
     assert "python -m pytest" in text
-    assert "python main.py" in text
-    assert "--include-hidden" in text
+    assert "uses: ./" in text
+    assert "include-hidden:" in text
     assert "permissions:" in text
     assert "contents: read" in text
+    assert "persist-credentials: false" in text
+    assert "--update-baseline" not in text

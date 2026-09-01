@@ -1,0 +1,41 @@
+name: Secret Scanner
+description: Scan the workspace for leaked secrets. Findings are masked; plaintext is never printed.
+author: Dryhawell
+branding:
+  icon: shield
+  color: gray-dark
+
+inputs:
+  path:
+    description: Directory or file to scan (workspace-relative). Must not look like a CLI flag.
+    required: false
+    default: "."
+  include-hidden:
+    description: Scan hidden directories such as .github (never .git / .venv)
+    required: false
+    default: "false"
+  severity:
+    description: Minimum severity to report (LOW, MEDIUM, HIGH, or CRITICAL)
+    required: false
+    default: "LOW"
+  python-version:
+    description: Python version for actions/setup-python (3.11 or newer)
+    required: false
+    default: "3.12"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Scan for leaked secrets
+      shell: bash
+      env:
+        SECRET_SCANNER_ROOT: ${{ github.action_path }}
+        SECRET_SCANNER_PATH: ${{ inputs.path }}
+        SECRET_SCANNER_INCLUDE_HIDDEN: ${{ inputs.include-hidden }}
+        SECRET_SCANNER_SEVERITY: ${{ inputs.severity }}
+      run: python "$SECRET_SCANNER_ROOT/cli/github_action.py"

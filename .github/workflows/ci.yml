@@ -56,15 +56,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - name: Scan for leaked secrets
-        # Stdlib only — pytest is not required to run the scanner.
+        # Dogfood the composite action (stdlib scan, --no-color in Action logs).
         # Allowlist: .secret-scanner-ignore. Checkout is clean, so --staged is empty.
-        run: >
-          python main.py .
-          --no-color
-          --include-hidden
+        uses: ./
+        with:
+          include-hidden: true

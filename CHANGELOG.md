@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.15.0 — 2026-09-01
+
+### Added
+
+- GitHub composite action (`action.yml`) for `uses: Dryhawell/secret-scanner@v1.15.0`
+- Inputs go through env vars (path cannot add extra CLI flags)
+- This repository's secret-scan job dogfoods `uses: ./`
+
 ## 1.14.0 — 2026-09-01
 
 ### Added

@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.14.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.15.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.14.0
+# Secret Scanner 1.15.0
 ```
 
 ## Why Secret Scanner?
@@ -40,6 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.15.0`)
 - `--jobs` worker threads for file scans (default 1)
 - Localhost HTML dashboard (`--dashboard`)
 - Path / finding allowlist (`.secret-scanner-ignore`) and inline `secret-scanner:ignore`
@@ -469,13 +470,15 @@ finding is not a complete incident response.
 ## CI/CD Integration
 
 GitHub Actions workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+Composite action: [`action.yml`](action.yml).
 
 This repository’s pipeline:
 
 1. Runs `pytest` on Python 3.11 and 3.12.
-2. Scans the tree (`--include-hidden`) using [`.secret-scanner-ignore`](.secret-scanner-ignore)
-   so test fixtures and a known contextual false positive are skipped. A real
-   vendor-format key in product code still fails the job.
+2. Scans the tree via `uses: ./` (`include-hidden: true`) using
+   [`.secret-scanner-ignore`](.secret-scanner-ignore) so test fixtures and a known
+   contextual false positive are skipped. A real vendor-format key in product
+   code still fails the job.
 
 Exit codes (the language of CI):
 
@@ -485,7 +488,29 @@ Exit codes (the language of CI):
 | 1 | Findings reported — fail the job |
 | 2 | Scanner error (missing path, not a Git repo, …) |
 
-Example job for another project (stdlib only; no `pip` required to scan):
+Other repositories (pin a **tag**, not `@main`):
+
+```yaml
+permissions:
+  contents: read
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: Dryhawell/secret-scanner@v1.15.0
+        with:
+          include-hidden: true
+```
+
+Inputs: `path` (default `.`), `include-hidden`, `severity`, `python-version`.
+The action always passes `--no-color` (Actions logs). It does not run
+`--dashboard`, `--update-baseline`, `--stdin`, or Git scan flags. Put extra
+policy in `.secret-scanner.json` / `.secret-scanner-ignore` in *your* repo.
+
+Without the action, if this tree is already checked out:
 
 ```yaml
 - name: Secret scan
@@ -514,7 +539,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-and history modes, `--since` deltas, `--stdin`, parallel file scans, the localhost dashboard, the hook
+and history modes, `--since` deltas, `--stdin`, the GitHub composite action, parallel file scans, the localhost dashboard, the hook
 installer, project config files, custom patterns, SARIF and HTML reports, and
 the CI workflow file. All credentials in tests are fakes.
 
@@ -556,12 +581,16 @@ the CI workflow file. All credentials in tests are fakes.
 - Detection is never 100% accurate.
 - `--dashboard` is a local helper, not a multi-user app. It does not scan
   Git history. Binding is loopback-only; do not publish the port.
+- The GitHub composite action scans the **caller workspace** after checkout.
+  Pin a release tag (or commit SHA). `uses: ./` is only for this repository.
+  It does not upload SARIF and does not grant extra `permissions`.
 
 ## Architecture
 
 ```text
 main.py                 entry point (exit code from cli)
 cli/interface.py        argparse, text/JSON output, Git flags, --stdin
+cli/github_action.py    composite-action argv (env → CLI, --no-color)
 cli/dashboard.py        localhost HTML dashboard (127.0.0.1)
 scanner/
   file_handler.py       discovery, excludes, binary/size caps
@@ -586,6 +615,7 @@ utils/reporter.py       masked JSON
 utils/sarif.py          SARIF 2.1.0 (no snippets)
 utils/html_report.py    self-contained HTML (escaped, no snippets)
 hooks/pre-commit         committed hook template
+action.yml              GitHub composite action (repo root)
 tests/                  pytest
 .github/workflows/     CI
 ```
