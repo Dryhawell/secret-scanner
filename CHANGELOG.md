@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.14.0 — 2026-09-01
+
+### Added
+
+- `--stdin` scans a piped buffer in memory (no temp file)
+- Interactive TTY is refused (exit 2); same 5 MiB size cap as files
+- Mutually exclusive with Git scan flags, `--dashboard`, and `--install-hook`
+
 ## 1.13.0 — 2026-08-31
 
 ### Added

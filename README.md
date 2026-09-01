@@ -3,9 +3,9 @@
 [![CI](https://github.com/Dryhawell/secret-scanner/actions/workflows/ci.yml/badge.svg)](https://github.com/Dryhawell/secret-scanner/actions/workflows/ci.yml)
 
 A defensive Python CLI that scans a project directory, Git staged/changed
-files, and recent Git history for accidentally committed secrets: API keys,
-tokens, passwords, private keys, cloud credentials, JWTs, and generic
-high-entropy assignments.
+files, recent Git history, or a piped stdin buffer for accidentally committed
+secrets: API keys, tokens, passwords, private keys, cloud credentials, JWTs,
+and generic high-entropy assignments.
 
 Built for **secret leakage prevention**. It is not an offensive security tool
 and it is not a secret manager.
@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.13.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.14.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.13.0
+# Secret Scanner 1.14.0
 ```
 
 ## Why Secret Scanner?
@@ -39,6 +39,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Severity (CRITICAL → LOW) and confidence (5–99)
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
+- `--stdin` piped buffer (no temp file)
 - `--jobs` worker threads for file scans (default 1)
 - Localhost HTML dashboard (`--dashboard`)
 - Path / finding allowlist (`.secret-scanner-ignore`) and inline `secret-scanner:ignore`
@@ -145,6 +146,7 @@ python main.py [path] [options]
 | `--history-depth N` | How many recent commits `--history` reads (default: 200, max 5000) |
 | `--since REF` | Files changed since REF (`git diff REF...HEAD`, not untracked) |
 | `--jobs N` / `-j N` | Worker threads for file scans (default: 1, `0` = CPU count, max 32) |
+| `--stdin` | Scan text from stdin (pipe). Does not write the buffer to disk |
 | `--dashboard` | Localhost HTML dashboard (`127.0.0.1` only) |
 | `--port N` | Dashboard port (default: 8765) |
 | `--no-browser` | Do not open a browser when the dashboard starts |
@@ -167,7 +169,9 @@ in pipelines. `--history` walks `git log -p` for the last N commits; deleting a
 file in HEAD does not hide the commit that introduced it. `--since origin/main`
 scans only files in the PR delta (`origin/main...HEAD`); fetch the base ref
 first (`fetch-depth: 0`). `--dashboard` cannot be combined with those Git flags,
-`--install-hook`, or `--update-baseline`.
+`--stdin`, `--install-hook`, or `--update-baseline`. `--stdin` cannot be
+combined with those Git flags, `--dashboard`, or `--install-hook`. A TTY
+(no pipe) with `--stdin` exits 2.
 
 ## CLI Examples
 
@@ -181,6 +185,9 @@ python main.py . --changed
 python main.py . --history
 python main.py . --history --history-depth 500
 python main.py . --since origin/main
+python main.py --stdin
+python main.py leak.py --stdin
+Get-Content app.py -Raw | python main.py --stdin
 python main.py . --jobs 4
 python main.py --dashboard
 python main.py --dashboard --no-browser --port 8765
@@ -437,7 +444,7 @@ JavaScript. POST `/scan` requires the CSRF token from the form. The Host
 header must be loopback. Paths that look like URLs are rejected.
 
 The dashboard runs a working-tree scan (the same engine as `python main.py PATH`).
-Use the CLI for `--staged`, `--changed`, `--history`, and `--since`. Do not expose this
+Use the CLI for `--staged`, `--changed`, `--history`, `--since`, and `--stdin`. Do not expose this
 port on a network or reverse-proxy it to the internet.
 
 ```text
@@ -507,7 +514,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-and history modes, `--since` deltas, parallel file scans, the localhost dashboard, the hook
+and history modes, `--since` deltas, `--stdin`, parallel file scans, the localhost dashboard, the hook
 installer, project config files, custom patterns, SARIF and HTML reports, and
 the CI workflow file. All credentials in tests are fakes.
 
@@ -542,8 +549,10 @@ the CI workflow file. All credentials in tests are fakes.
   the original line. HTML reports are escaped and also omit snippets.
 - `--jobs` uses threads (`concurrent.futures`). CPython's GIL means regex
   matching does not scale linearly with cores; overlapping file reads still
-  help. Default is 1 (same as a sequential scan). `--history` stays
+  help. Default is 1 (same as a sequential scan). `--history` and `--stdin` stay
   single-threaded.
+- `--stdin` scans one in-memory buffer, not a repository walk. A TTY is
+  refused (exit 2). The same 5 MiB cap as files applies.
 - Detection is never 100% accurate.
 - `--dashboard` is a local helper, not a multi-user app. It does not scan
   Git history. Binding is loopback-only; do not publish the port.
@@ -552,7 +561,7 @@ the CI workflow file. All credentials in tests are fakes.
 
 ```text
 main.py                 entry point (exit code from cli)
-cli/interface.py        argparse, text/JSON output, Git flags
+cli/interface.py        argparse, text/JSON output, Git flags, --stdin
 cli/dashboard.py        localhost HTML dashboard (127.0.0.1)
 scanner/
   file_handler.py       discovery, excludes, binary/size caps
@@ -571,7 +580,7 @@ scanner/
   baseline.py           hashed finding baseline
   hook.py               copy template into .git/hooks
   config_file.py        JSON / subset-YAML project config (including patterns)
-  scanner.py            orchestration (optional thread pool for files)
+  scanner.py            orchestration (optional thread pool for files; stdin/history stay sequential)
 utils/logger.py         file logs, no secret values
 utils/reporter.py       masked JSON
 utils/sarif.py          SARIF 2.1.0 (no snippets)

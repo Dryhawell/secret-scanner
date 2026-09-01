@@ -84,6 +84,74 @@ class Scanner:
         _LOG.info("Discovered %s candidate file(s)", len(files))
         return self._scan_file_list(files, target=root, started_at=started_at)
 
+    def scan_text(self, text: str, *, virtual_path: Path, target: Path) -> ScanResult:
+        """Scan an in-memory buffer (stdin). ``text`` is not logged."""
+        started_at = datetime.now(timezone.utc)
+        _LOG.info("Scan started (stdin): %s", virtual_path)
+        findings: list[SecretFinding] = []
+        placeholders_ignored = 0
+        allowlist_ignored = 0
+        baseline_ignored = 0
+        root = ignore_root(target)
+        path = virtual_path
+        skip_names = {
+            ".secret-scanner-baseline.json",
+            ".secret-scanner.json",
+            ".secret-scanner.yml",
+            ".secret-scanner.yaml",
+        }
+        lines = text.splitlines()
+        if (
+            path.name.casefold() in skip_names
+            or has_excluded_extension(path, self.config)
+            or is_ignored_path(path, root, self.config.ignore_paths)
+        ):
+            finished_at = datetime.now(timezone.utc)
+            return ScanResult(
+                target=target.expanduser(),
+                started_at=started_at,
+                finished_at=finished_at,
+                files_scanned=0,
+                lines_scanned=0,
+                findings=(),
+            )
+        for line_number, line in enumerate(lines, start=1):
+            line_findings, line_ignored, line_inline = self.detector.scan_line(
+                line, path, line_number
+            )
+            placeholders_ignored += line_ignored
+            allowlist_ignored += line_inline
+            for finding in line_findings:
+                if is_ignored_finding(
+                    finding.file_path,
+                    finding.pattern_name,
+                    root,
+                    self.config.ignore_findings,
+                ):
+                    allowlist_ignored += 1
+                    continue
+                if is_baselined(finding, root, self.config.baseline_keys):
+                    baseline_ignored += 1
+                    continue
+                findings.append(finding)
+        finished_at = datetime.now(timezone.utc)
+        _LOG.info(
+            "Stdin scan completed: lines=%s findings=%s",
+            len(lines),
+            len(findings),
+        )
+        return ScanResult(
+            target=target.expanduser(),
+            started_at=started_at,
+            finished_at=finished_at,
+            files_scanned=1,
+            lines_scanned=len(lines),
+            findings=tuple(findings),
+            placeholders_ignored=placeholders_ignored,
+            allowlist_ignored=allowlist_ignored,
+            baseline_ignored=baseline_ignored,
+        )
+
     def scan_history(self, lines: Sequence[HistoryLine], *, target: Path) -> ScanResult:
         """Scan added lines from Git history. Files need not exist on disk."""
         started_at = datetime.now(timezone.utc)

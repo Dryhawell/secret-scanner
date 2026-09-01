@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import TextIO
 
 from scanner.baseline import (
     BaselineError,
@@ -19,7 +20,7 @@ from scanner.baseline import (
     write_baseline,
 )
 from scanner.config_file import ConfigError, FileSettings, load_config_file, resolve_config_path
-from scanner.file_handler import MAX_JOBS, ScanConfig, resolve_jobs
+from scanner.file_handler import DEFAULT_MAX_FILE_SIZE, MAX_JOBS, ScanConfig, resolve_jobs
 from scanner.git_mode import (
     GitError,
     list_changed_files,
@@ -76,7 +77,8 @@ examples:
   python main.py . --changed
   python main.py . --history
   python main.py . --since origin/main
-  python main.py . --jobs 4
+  python main.py --stdin
+  python main.py --jobs 4
   python main.py --dashboard --no-browser
   python main.py --version
   python main.py . --ignore-file .secret-scanner-ignore
@@ -192,7 +194,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="N",
         help="Worker threads for file scans (default: 1, 0 = CPU count, max 32). "
-        "Does not apply to --history.",
+        "Does not apply to --history or --stdin.",
+    )
+    parser.add_argument(
+        "--stdin",
+        action="store_true",
+        help="Scan text from stdin (pipe). Does not write the buffer to disk.",
     )
     parser.add_argument(
         "--dashboard",
@@ -273,6 +280,22 @@ def _parse_port(raw: str) -> int:
 def resolve_target(namespace: argparse.Namespace) -> Path:
     raw = namespace.path_option or namespace.path or "."
     return Path(raw)
+
+
+def stdin_virtual_path(namespace: argparse.Namespace) -> Path:
+    """Finding path label for --stdin. ``.`` is a stream, not a directory walk."""
+    raw = namespace.path_option or namespace.path
+    if not raw or raw in {".", "./"}:
+        return Path("stdin")
+    return Path(raw)
+
+
+def stdin_is_tty(stream: TextIO) -> bool:
+    """True when the stream is an interactive terminal. StringIO is not a TTY."""
+    checker = getattr(stream, "isatty", None)
+    if not callable(checker):
+        return False
+    return bool(checker())
 
 
 def build_scan_config(
@@ -521,16 +544,25 @@ def run(
     *,
     reports_dir: Path | None = None,
     log_file: Path | None = None,
+    stdin: TextIO | None = None,
 ) -> int:
     parser = build_parser()
     namespace = parser.parse_args(argv)
     target = resolve_target(namespace)
     setup_logging(log_file=log_file, verbose=namespace.verbose)
+    stdin_stream: TextIO | None = None
+    stdin_label: Path | None = None
 
     if namespace.dashboard:
         if namespace.install_hook or namespace.update_baseline:
             print(
                 "Error: --dashboard cannot be combined with --install-hook or --update-baseline",
+                file=sys.stderr,
+            )
+            return 2
+        if namespace.stdin:
+            print(
+                "Error: --dashboard cannot be combined with --stdin",
                 file=sys.stderr,
             )
             return 2
@@ -547,7 +579,27 @@ def run(
             open_browser=not namespace.no_browser,
         )
 
-    if not target.exists():
+    if namespace.stdin:
+        if namespace.install_hook:
+            print(
+                "Error: --stdin cannot be combined with --install-hook",
+                file=sys.stderr,
+            )
+            return 2
+        if namespace.staged or namespace.changed or namespace.history or namespace.since:
+            print(
+                "Error: --stdin cannot be combined with Git scan flags",
+                file=sys.stderr,
+            )
+            return 2
+        stdin_stream = stdin if stdin is not None else sys.stdin
+        if stdin_is_tty(stdin_stream):
+            print("Error: --stdin requires piped input", file=sys.stderr)
+            return 2
+        stdin_label = stdin_virtual_path(namespace)
+        target = Path.cwd()
+
+    if not namespace.stdin and not target.exists():
         get_logger().error("Target does not exist: %s", target)
         print(f"Error: Target does not exist: {target}", file=sys.stderr)
         return 2
@@ -586,7 +638,23 @@ def run(
     try:
         apply_ignore_file(scanner.config, namespace, target, settings)
         apply_baseline(scanner.config, namespace, target, settings)
-        if namespace.history:
+        if namespace.stdin:
+            assert stdin_stream is not None
+            assert stdin_label is not None
+            try:
+                text = stdin_stream.read()
+            except (OSError, UnicodeError) as exc:
+                get_logger().error("Unable to read stdin: %s", exc)
+                print(f"Error: {exc}", file=sys.stderr)
+                return 2
+            if len(text.encode("utf-8")) > DEFAULT_MAX_FILE_SIZE:
+                get_logger().error("stdin exceeds the 5 MiB size limit")
+                print("Error: stdin exceeds the 5 MiB size limit", file=sys.stderr)
+                return 2
+            result = scanner.scan_text(
+                text, virtual_path=stdin_label, target=target
+            )
+        elif namespace.history:
             if namespace.history_depth < 1 or namespace.history_depth > 5000:
                 raise GitError("history depth must be between 1 and 5000")
             root = repo_root(target)
