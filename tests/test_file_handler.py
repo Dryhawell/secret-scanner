@@ -4,7 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from scanner.file_handler import ScanConfig, iter_scan_files, looks_like_binary, should_scan_file
+from scanner.file_handler import (
+    ScanConfig,
+    iter_scan_files,
+    looks_like_binary,
+    matches_glob,
+    normalize_glob,
+    should_scan_file,
+)
 
 
 def _names(paths: list[Path]) -> set[str]:
@@ -163,5 +170,48 @@ def test_unlimited_size_when_max_file_size_is_none(tmp_path: Path) -> None:
     huge.write_bytes(b"A" * 200)
     config = ScanConfig(max_file_size_bytes=None)
     assert should_scan_file(huge, config)
+
+
+def test_name_glob_matches_any_folder(tmp_path: Path) -> None:
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    (tmp_path / ".env").write_text("EXAMPLE=placeholder\n", encoding="utf-8")
+    (tmp_path / "readme.md").write_text("ok\n", encoding="utf-8")
+    config = ScanConfig(include_globs=["*.env"])
+    found = list(iter_scan_files(tmp_path, config))
+    assert _names(found) == {".env"}
+
+
+def test_skip_glob_drops_matching_names(tmp_path: Path) -> None:
+    (tmp_path / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    (tmp_path / "readme.md").write_text("ok\n", encoding="utf-8")
+    config = ScanConfig(skip_globs=["*.md"])
+    found = list(iter_scan_files(tmp_path, config))
+    assert _names(found) == {"app.py"}
+
+
+def test_path_glob_is_relative_to_scan_root(tmp_path: Path) -> None:
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    (tmp_path / "root.py").write_text("print('ok')\n", encoding="utf-8")
+    config = ScanConfig(include_globs=["src/*.py"])
+    found = list(iter_scan_files(tmp_path, config))
+    assert _names(found) == {"app.py"}
+
+
+def test_glob_match_is_case_insensitive(tmp_path: Path) -> None:
+    assert matches_glob(tmp_path / "App.PY", "*.py")
+    assert matches_glob(tmp_path / ".ENV", "*.env")
+
+
+def test_normalize_glob_rejects_flag_like_pattern() -> None:
+    from scanner.file_handler import GlobError
+
+    with pytest.raises(GlobError):
+        normalize_glob("--staged")
+    with pytest.raises(GlobError):
+        normalize_glob("")
 
 

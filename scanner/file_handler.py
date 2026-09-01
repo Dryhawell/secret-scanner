@@ -10,6 +10,7 @@ Why this split exists:
 
 from __future__ import annotations
 
+import fnmatch
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -70,6 +71,8 @@ DEFAULT_MAX_FILE_SIZE = 5 * 1024 * 1024
 
 # Thread pool size for file scans. 0 on the CLI means "use CPU count".
 MAX_JOBS = 32
+MAX_GLOBS = 32
+MAX_GLOB_LENGTH = 256
 
 # Hashed baseline JSON uses the key "fingerprint"; still skip the default
 # filename so a committed baseline is never scanned as source.
@@ -109,6 +112,8 @@ class ScanConfig:
     ignore_findings: list[tuple[str, str]] = field(default_factory=list)
     baseline_keys: set[tuple[str, str]] = field(default_factory=set)
     jobs: int = 1
+    include_globs: list[str] = field(default_factory=list)
+    skip_globs: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Normalize names so Windows and Linux behave the same."""
@@ -124,6 +129,64 @@ class ScanConfig:
     def exclude_dir(self, name: str) -> None:
         """Skip directories named ``name`` (compared case-insensitively)."""
         self.excluded_dirs.add(name.casefold())
+
+
+class GlobError(ValueError):
+    """Invalid include/skip glob pattern."""
+
+
+def normalize_glob(pattern: str) -> str:
+    """Strip, posix-ify slashes, and reject empty / flag-like / oversized patterns."""
+    value = pattern.strip().replace("\\", "/")
+    if not value or "\n" in pattern or "\r" in pattern:
+        raise GlobError("glob must be a single non-empty pattern")
+    if value.startswith("-"):
+        raise GlobError("glob must not look like a CLI flag")
+    if len(value) > MAX_GLOB_LENGTH:
+        raise GlobError("glob is too long")
+    return value
+
+
+def matches_glob(path: Path, pattern: str, *, root: Path | None = None) -> bool:
+    """True if ``path`` matches a shell-style glob (case-insensitive).
+
+    A pattern without ``/`` matches the file name only (``*.env`` → ``.env``
+    in any folder). A pattern with ``/`` matches the path relative to
+    ``root``. ``fnmatch`` is not gitignore: ``*`` in a path pattern can
+    match across directories.
+    """
+    folded = pattern.replace("\\", "/").casefold()
+    if "/" not in folded:
+        return fnmatch.fnmatch(path.name.casefold(), folded)
+    relative = _relative_posix(path, root)
+    return fnmatch.fnmatch(relative, folded)
+
+
+def _relative_posix(path: Path, root: Path | None) -> str:
+    posix = path.as_posix().casefold()
+    if root is None:
+        return posix
+    try:
+        return path.expanduser().resolve().relative_to(
+            root.expanduser().resolve()
+        ).as_posix().casefold()
+    except ValueError:
+        return posix
+
+
+def passes_glob_filters(
+    path: Path, config: ScanConfig, *, root: Path | None = None
+) -> bool:
+    """Apply skip globs first, then optional include globs."""
+    if config.skip_globs and any(
+        matches_glob(path, pattern, root=root) for pattern in config.skip_globs
+    ):
+        return False
+    if config.include_globs:
+        return any(
+            matches_glob(path, pattern, root=root) for pattern in config.include_globs
+        )
+    return True
 
 
 def resolve_jobs(requested: int) -> int:
@@ -183,7 +246,9 @@ def is_oversized_file(path: Path, config: ScanConfig) -> bool:
     return size > limit
 
 
-def should_scan_file(path: Path, config: ScanConfig) -> bool:
+def should_scan_file(
+    path: Path, config: ScanConfig, *, root: Path | None = None
+) -> bool:
     """Return True if this file should be a scan candidate.
 
     Cheap checks run first (symlink, extension, size) so we do not open a
@@ -196,6 +261,8 @@ def should_scan_file(path: Path, config: ScanConfig) -> bool:
     if path.name.casefold() in _SKIP_FILENAMES:
         return False
     if has_excluded_extension(path, config):
+        return False
+    if not passes_glob_filters(path, config, root=root):
         return False
     if is_oversized_file(path, config):
         _LOG.debug("Skipping oversized file %s", path)
@@ -220,7 +287,8 @@ def iter_scan_files(root: str | Path, config: ScanConfig | None = None) -> Itera
     target = target.resolve()
 
     if target.is_file():
-        if should_scan_file(target, config):
+        parent = target.parent
+        if should_scan_file(target, config, root=parent):
             yield target
         return
 
@@ -231,10 +299,12 @@ def iter_scan_files(root: str | Path, config: ScanConfig | None = None) -> Itera
     if is_excluded_directory(target, config):
         return
 
-    yield from _walk_directory(target, config)
+    yield from _walk_directory(target, config, root=target)
 
 
-def _walk_directory(directory: Path, config: ScanConfig) -> Iterator[Path]:
+def _walk_directory(
+    directory: Path, config: ScanConfig, *, root: Path
+) -> Iterator[Path]:
     """Recursively walk one directory using pathlib, not os.walk."""
     try:
         children = sorted(directory.iterdir(), key=lambda item: item.name.casefold())
@@ -258,7 +328,7 @@ def _walk_directory(directory: Path, config: ScanConfig) -> Iterator[Path]:
                 continue
             if _skip_hidden_directory(child, config):
                 continue
-            yield from _walk_directory(child, config)
+            yield from _walk_directory(child, config, root=root)
         elif is_file:
-            if should_scan_file(child, config):
+            if should_scan_file(child, config, root=root):
                 yield child.resolve()

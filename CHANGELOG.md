@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.17.0 — 2026-09-01
+
+### Added
+
+- `--glob` / `--skip-glob` file patterns (`*.env`, `src/*.py`)
+- Config keys `glob` and `skip_glob`
+- `--exclude` stays a directory *name*; globs do not re-enter `node_modules`
+
 ## 1.16.0 — 2026-09-01
 
 ### Added

@@ -25,6 +25,13 @@ def test_parse_json_object() -> None:
     assert settings.exclude == ("dist",)
 
 
+def test_parse_json_globs() -> None:
+    data = parse_json_text('{"glob": ["*.py"], "skip_glob": ["*.min.js"]}')
+    settings = settings_from_mapping(data, base=Path("."))
+    assert settings.glob == ("*.py",)
+    assert settings.skip_glob == ("*.min.js",)
+
+
 def test_parse_yaml_subset_with_list_and_comment() -> None:
     data = parse_yaml_text(
         dedent(
@@ -42,6 +49,11 @@ def test_parse_yaml_subset_with_list_and_comment() -> None:
     assert settings.severity == "HIGH"
     assert settings.include_hidden is True
     assert settings.exclude == ("dist", "build")
+
+
+def test_flag_like_config_glob_is_rejected() -> None:
+    with pytest.raises(ConfigError, match="CLI flag"):
+        settings_from_mapping({"glob": ["--staged"]}, base=Path("."))
 
 
 def test_unknown_key_is_rejected() -> None:
@@ -113,6 +125,23 @@ def test_cli_yaml_exclude(tmp_path: Path) -> None:
     config.write_text("exclude:\n  - dist\n", encoding="utf-8")
     code = run(
         ["--no-color", str(tmp_path)],
+        log_file=tmp_path / "cli.log",
+        reports_dir=tmp_path / "reports",
+    )
+    assert code == 0
+
+
+def test_cli_config_glob_limits_files(tmp_path: Path) -> None:
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    (tmp_path / "app.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "ok.env").write_text("EXAMPLE=placeholder\n", encoding="utf-8")
+    config = tmp_path / "scan.json"
+    config.write_text('{"glob": ["*.env"]}\n', encoding="utf-8")
+    code = run(
+        ["--no-color", "--config", str(config), str(tmp_path)],
         log_file=tmp_path / "cli.log",
         reports_dir=tmp_path / "reports",
     )

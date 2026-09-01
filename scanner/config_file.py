@@ -13,7 +13,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from scanner.file_handler import MAX_JOBS
+from scanner.file_handler import MAX_GLOBS, MAX_GLOB_LENGTH, MAX_JOBS, GlobError, normalize_glob
 from scanner.ignore import default_sidecar
 from scanner.models import SecretPattern, Severity
 from utils.logger import get_logger
@@ -33,6 +33,8 @@ _ALLOWED_KEYS = frozenset(
     {
         "severity",
         "exclude",
+        "glob",
+        "skip_glob",
         "include_hidden",
         "no_color",
         "verbose",
@@ -71,6 +73,8 @@ class FileSettings:
 
     severity: str | None = None
     exclude: tuple[str, ...] = ()
+    glob: tuple[str, ...] = ()
+    skip_glob: tuple[str, ...] = ()
     include_hidden: bool | None = None
     no_color: bool | None = None
     verbose: bool | None = None
@@ -311,9 +315,13 @@ def settings_from_mapping(data: dict[str, object], *, base: Path) -> FileSetting
             raise ConfigError("Config format must be 'text', 'json', 'sarif', or 'html'.")
         format_name = folded
     exclude = _string_list(data, "exclude")
+    glob_patterns = _glob_list(data, "glob")
+    skip_glob = _glob_list(data, "skip_glob")
     return FileSettings(
         severity=severity,
         exclude=tuple(exclude),
+        glob=tuple(glob_patterns),
+        skip_glob=tuple(skip_glob),
         include_hidden=_optional_bool(data, "include_hidden"),
         no_color=_optional_bool(data, "no_color"),
         verbose=_optional_bool(data, "verbose"),
@@ -341,6 +349,21 @@ def _optional_bool(data: dict[str, object], key: str) -> bool | None:
     if not isinstance(value, bool):
         raise ConfigError(f"Config {key} must be a boolean.")
     return value
+
+
+def _glob_list(data: dict[str, object], key: str) -> list[str]:
+    values = _string_list(data, key)
+    if len(values) > MAX_GLOBS:
+        raise ConfigError(f"Config {key} accepts at most {MAX_GLOBS} patterns.")
+    normalized: list[str] = []
+    for item in values:
+        if len(item) > MAX_GLOB_LENGTH:
+            raise ConfigError(f"Config {key} pattern is too long.")
+        try:
+            normalized.append(normalize_glob(item))
+        except GlobError as exc:
+            raise ConfigError(f"Config {key}: {exc}") from exc
+    return normalized
 
 
 def _string_list(data: dict[str, object], key: str) -> list[str]:

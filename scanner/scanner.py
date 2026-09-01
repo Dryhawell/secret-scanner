@@ -13,6 +13,7 @@ from scanner.file_handler import (
     ScanConfig,
     has_excluded_extension,
     iter_scan_files,
+    passes_glob_filters,
     resolve_jobs,
     should_scan_file,
 )
@@ -61,7 +62,7 @@ class Scanner:
             resolved = path.expanduser().resolve()
             if resolved in seen:
                 continue
-            if not should_scan_file(resolved, self.config):
+            if not should_scan_file(resolved, self.config, root=target):
                 continue
             if is_ignored_path(resolved, ignore_root(target), self.config.ignore_paths):
                 _LOG.debug("Allowlist skipped file %s", resolved)
@@ -105,6 +106,7 @@ class Scanner:
             path.name.casefold() in skip_names
             or has_excluded_extension(path, self.config)
             or is_ignored_path(path, root, self.config.ignore_paths)
+            or not passes_glob_filters(path, self.config, root=root)
         ):
             finished_at = datetime.now(timezone.utc)
             return ScanResult(
@@ -171,6 +173,8 @@ class Scanner:
                 continue
             path = root / item.relative_path
             if has_excluded_extension(path, self.config):
+                continue
+            if not passes_glob_filters(path, self.config, root=root):
                 continue
             if is_ignored_path(path, root, self.config.ignore_paths):
                 continue

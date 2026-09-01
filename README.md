@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.16.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.17.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.16.0
+# Secret Scanner 1.17.0
 ```
 
 ## Why Secret Scanner?
@@ -32,7 +32,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 
 ## Features
 
-- Recursive directory scan with binary, size, and ignore rules
+- Recursive directory scan with binary, size, ignore, and file glob rules
 - Vendor format regexes plus contextual assignment analysis
 - Placeholder filtering (documentation dummies are dropped)
 - Shannon entropy as a supporting signal (not a standalone detector)
@@ -40,7 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
-- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.16.0`)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.17.0`)
 - `--jobs` worker threads for file scans (default 1)
 - Localhost HTML dashboard (`--dashboard`)
 - Path / finding allowlist (`.secret-scanner-ignore`) and inline `secret-scanner:ignore`
@@ -146,7 +146,9 @@ python main.py [path] [options]
 | Flag | Meaning |
 |---|---|
 | `--severity LOW\|MEDIUM\|HIGH\|CRITICAL` | Minimum severity to report (default: LOW) |
-| `--exclude NAME` | Extra directory name to skip (repeatable) |
+| `--exclude NAME` | Extra directory name to skip (repeatable), not a file glob |
+| `--glob PATTERN` | Only files matching this glob (repeatable). `*.env` is the name in any folder |
+| `--skip-glob PATTERN` | Skip matching files (repeatable). Applied after `--glob` |
 | `--include-hidden` | Scan hidden directories such as `.github` (never `.git` / `.venv`) |
 | `--staged` | Only files in the Git index (`git diff --cached`) |
 | `--changed` | Working tree vs `HEAD`, plus untracked files |
@@ -188,6 +190,8 @@ python main.py .
 python main.py ./src
 python main.py . --severity HIGH
 python main.py . --exclude dist --exclude build
+python main.py . --glob "*.env" --glob "*.py"
+python main.py . --skip-glob "*.min.js"
 python main.py . --staged
 python main.py . --changed
 python main.py . --history
@@ -282,6 +286,8 @@ JSON:
 {
   "severity": "HIGH",
   "exclude": ["dist", "build"],
+  "glob": ["*.py", "*.env"],
+  "skip_glob": ["*.min.js"],
   "include_hidden": false,
   "no_color": true,
   "format": "text",
@@ -507,7 +513,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.16.0
+      - uses: Dryhawell/secret-scanner@v1.17.0
         with:
           include-hidden: true
 ```
@@ -546,7 +552,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-and history modes, `--since` deltas, `--stdin`, the GitHub composite action, parallel file scans, the localhost dashboard, the hook
+and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, parallel file scans, the localhost dashboard, the hook
 installer, project config files, custom patterns, SARIF and HTML reports, and
 the CI workflow file. All credentials in tests are fakes.
 
@@ -565,6 +571,11 @@ the CI workflow file. All credentials in tests are fakes.
   a merge may be missed.
 - Files larger than 5 MiB and skipped binaries are not scanned (false
   negatives by design, for performance).
+- `--glob` / `--skip-glob` use `fnmatch`, not gitignore. A name pattern
+  (`*.py`) matches the file name in any folder. A pattern with `/` is
+  relative to the scan root; `*` there can match across directories.
+  Excluded directories (`node_modules`, `--exclude dist`) are never
+  walked, so a glob cannot re-include them.
 - `--staged` does not scan untracked files; `--changed` does not equal
   “the whole repository”. `--since REF` only lists `REF...HEAD`; a leak
   that already sat on the base branch and was not edited is skipped.
@@ -600,7 +611,7 @@ cli/interface.py        argparse, text/JSON output, Git flags, --stdin
 cli/github_action.py    composite-action argv (env → CLI, --no-color)
 cli/dashboard.py        localhost HTML dashboard (127.0.0.1)
 scanner/
-  file_handler.py       discovery, excludes, binary/size caps
+  file_handler.py       discovery, excludes, globs, binary/size caps
   patterns.py           compiled regex catalog (plus config custom patterns)
   detector.py           line-by-line scan, masking
   context.py            sensitive assignments

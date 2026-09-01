@@ -20,7 +20,14 @@ from scanner.baseline import (
     write_baseline,
 )
 from scanner.config_file import ConfigError, FileSettings, load_config_file, resolve_config_path
-from scanner.file_handler import DEFAULT_MAX_FILE_SIZE, MAX_JOBS, ScanConfig, resolve_jobs
+from scanner.file_handler import (
+    DEFAULT_MAX_FILE_SIZE,
+    MAX_JOBS,
+    GlobError,
+    ScanConfig,
+    normalize_glob,
+    resolve_jobs,
+)
 from scanner.git_mode import (
     GitError,
     list_changed_files,
@@ -64,6 +71,8 @@ examples:
   python main.py ./src
   python main.py . --severity HIGH
   python main.py . --exclude dist --exclude build
+  python main.py . --glob "*.env" --glob "*.py"
+  python main.py . --skip-glob "*.min.js"
   python main.py . --no-color
   python main.py . --format json
   python main.py . --output reports/latest.json
@@ -129,6 +138,24 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         metavar="NAME",
         help="Extra directory name to skip; may be repeated",
+    )
+    parser.add_argument(
+        "--glob",
+        action="append",
+        default=[],
+        type=_parse_glob,
+        metavar="PATTERN",
+        help="Only scan files matching this glob (repeatable). "
+        "*.env matches the file name in any folder. Patterns with / are "
+        "relative to the scan root. Not a directory name (see --exclude).",
+    )
+    parser.add_argument(
+        "--skip-glob",
+        action="append",
+        default=[],
+        type=_parse_glob,
+        metavar="PATTERN",
+        help="Skip files matching this glob (repeatable). Applied after --glob.",
     )
     parser.add_argument(
         "--include-hidden",
@@ -254,6 +281,14 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _parse_glob(raw: str) -> str:
+    """Argparse type for --glob / --skip-glob."""
+    try:
+        return normalize_glob(raw)
+    except GlobError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+
+
 def _parse_jobs(raw: str) -> int:
     """Argparse type for --jobs. 0 means auto (CPU count)."""
     try:
@@ -311,6 +346,15 @@ def build_scan_config(
     names.extend(namespace.exclude)
     for name in names:
         config.exclude_dir(name)
+    includes: list[str] = []
+    skips: list[str] = []
+    if settings is not None:
+        includes.extend(settings.glob)
+        skips.extend(settings.skip_glob)
+    includes.extend(namespace.glob)
+    skips.extend(namespace.skip_glob)
+    config.include_globs = includes
+    config.skip_globs = skips
     requested = 1
     if settings is not None and settings.jobs is not None:
         requested = settings.jobs
