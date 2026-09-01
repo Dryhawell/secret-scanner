@@ -82,6 +82,7 @@ examples:
   python main.py . --severity HIGH
   python main.py --list-patterns
   python main.py . --skip-pattern "Contextual Secret"
+  python main.py . --only-pattern "AWS Access Key ID"
   python main.py . --exclude dist --exclude build
   python main.py . --glob "*.env" --glob "*.py"
   python main.py . --skip-glob "*.min.js"
@@ -165,6 +166,14 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="NAME",
         help="Disable a detection rule (repeatable). Names from --list-patterns. "
         "Skipping a vendor format can still leave a Contextual Secret on the same line.",
+    )
+    parser.add_argument(
+        "--only-pattern",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Only run these detection rules (repeatable). Names from --list-patterns. "
+        "Applied before --skip-pattern. An empty remaining set exits 2.",
     )
     parser.add_argument(
         "--exclude",
@@ -551,28 +560,23 @@ def known_pattern_names(engine: PatternEngine) -> dict[str, str]:
     return {name.casefold(): name for name in names}
 
 
-def resolve_skip_patterns(
-    namespace: argparse.Namespace,
-    settings: FileSettings,
-    engine: PatternEngine,
+def _canonical_pattern_names(
+    requested: list[str],
+    known: dict[str, str],
+    *,
+    kind: str,
 ) -> list[str]:
-    """Canonical skip names. Unknown names raise SkipPatternError."""
-    requested: list[str] = []
-    requested.extend(settings.skip_patterns)
-    requested.extend(namespace.skip_pattern)
-    if not requested:
-        return []
+    """Resolve operator names to catalog names. Unknown names raise SkipPatternError."""
     if len(requested) > MAX_SKIP_PATTERNS:
         raise SkipPatternError(
-            f"at most {MAX_SKIP_PATTERNS} skip-pattern names are allowed"
+            f"at most {MAX_SKIP_PATTERNS} {kind} names are allowed"
         )
-    known = known_pattern_names(engine)
-    skip: list[str] = []
+    names: list[str] = []
     seen: set[str] = set()
     for raw in requested:
         key = raw.strip()
         if not key:
-            raise SkipPatternError("skip-pattern names must be non-empty")
+            raise SkipPatternError(f"{kind} names must be non-empty")
         canon = known.get(key.casefold())
         if canon is None:
             raise SkipPatternError(
@@ -580,12 +584,44 @@ def resolve_skip_patterns(
             )
         if canon not in seen:
             seen.add(canon)
-            skip.append(canon)
-    regex_left = any(pattern.name not in seen for pattern in engine.patterns)
-    context_on = CONTEXTUAL_PATTERN_NAME not in seen
+            names.append(canon)
+    return names
+
+
+def resolve_skip_patterns(
+    namespace: argparse.Namespace,
+    settings: FileSettings,
+    engine: PatternEngine,
+) -> list[str]:
+    """Disabled rule names after --only-pattern allowlist and --skip-pattern."""
+    skip_raw: list[str] = []
+    skip_raw.extend(settings.skip_patterns)
+    skip_raw.extend(namespace.skip_pattern)
+    only_raw: list[str] = []
+    only_raw.extend(settings.only_patterns)
+    only_raw.extend(namespace.only_pattern)
+    if not skip_raw and not only_raw:
+        return []
+    known = known_pattern_names(engine)
+    skip_set = set(
+        _canonical_pattern_names(skip_raw, known, kind="skip-pattern")
+        if skip_raw
+        else []
+    )
+    only_set = set(
+        _canonical_pattern_names(only_raw, known, kind="only-pattern")
+        if only_raw
+        else []
+    )
+    if only_set:
+        disabled = (set(known.values()) - only_set) | skip_set
+    else:
+        disabled = skip_set
+    regex_left = any(pattern.name not in disabled for pattern in engine.patterns)
+    context_on = CONTEXTUAL_PATTERN_NAME not in disabled
     if not regex_left and not context_on:
         raise SkipPatternError("all detection rules were skipped")
-    return skip
+    return sorted(disabled)
 
 
 def resolve_min_confidence(

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.21.0 — 2026-09-01
+
+### Added
+
+- `--only-pattern NAME` runs an allowlist of rules (repeatable; case-insensitive)
+- Config key `only_patterns`; combined with `--skip-pattern` an empty set exits 2
+
 ## 1.20.0 — 2026-09-01
 
 ### Added

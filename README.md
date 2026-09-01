@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.20.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.21.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.20.0
+# Secret Scanner 1.21.0
 ```
 
 ## Why Secret Scanner?
@@ -40,7 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
-- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.20.0`)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.21.0`)
 - `--jobs` worker threads for file scans (default 1)
 - Localhost HTML dashboard (`--dashboard`)
 - Path / finding allowlist (`.secret-scanner-ignore`) and inline `secret-scanner:ignore`
@@ -52,7 +52,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Exit codes for CI (`0` clean, `1` findings, `2` error)
 - `--quiet` / `-q` (text report off; exit code unchanged)
 - `--min-confidence` report filter (not a detector change)
-- `--list-patterns` and `--skip-pattern` (disable a named rule)
+- `--list-patterns`, `--skip-pattern`, and `--only-pattern`
 
 ## Detection Engine
 
@@ -154,6 +154,7 @@ python main.py [path] [options]
 | `--min-confidence N` | Hide findings with confidence below N (0–99, default 0) |
 | `--list-patterns` | Print rule names (no regexes) and exit; does not scan |
 | `--skip-pattern NAME` | Disable a detection rule (repeatable). See `--list-patterns` |
+| `--only-pattern NAME` | Only run these rules (repeatable). Skip is applied after |
 | `--exclude NAME` | Extra directory name to skip (repeatable), not a file glob |
 | `--glob PATTERN` | Only files matching this glob (repeatable). `*.env` is the name in any folder |
 | `--skip-glob PATTERN` | Skip matching files (repeatable). Applied after `--glob` |
@@ -201,6 +202,7 @@ python main.py . --severity HIGH
 python main.py . --min-confidence 80
 python main.py --list-patterns
 python main.py . --skip-pattern "Contextual Secret"
+python main.py . --only-pattern "AWS Access Key ID"
 python main.py . --exclude dist --exclude build
 python main.py . --glob "*.env" --glob "*.py"
 python main.py . --skip-glob "*.min.js"
@@ -306,6 +308,7 @@ JSON:
   "quiet": false,
   "min_confidence": 0,
   "skip_patterns": ["Contextual Secret"],
+  "only_patterns": [],
   "format": "text",
   "ignore_file": ".secret-scanner-ignore",
   "baseline": ".secret-scanner-baseline.json",
@@ -529,7 +532,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.20.0
+      - uses: Dryhawell/secret-scanner@v1.21.0
         with:
           include-hidden: true
 ```
@@ -569,7 +572,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern`, parallel file scans, the localhost dashboard, the hook
+and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, parallel file scans, the localhost dashboard, the hook
 installer, project config files, custom patterns, SARIF and HTML reports, and
 the CI workflow file. All credentials in tests are fakes.
 
@@ -623,6 +626,9 @@ the CI workflow file. All credentials in tests are fakes.
 - `--skip-pattern` disables a detector, not a single finding. Skipping a
   vendor format can still leave a Contextual Secret on the same line.
   It is not a substitute for rotation.
+- `--only-pattern` is a detector allowlist. Other rules never produce
+  findings (and therefore do not enter `--update-baseline`). Combined
+  with `--skip-pattern` until nothing remains, the run exits 2.
 - The GitHub composite action scans the **caller workspace** after checkout.
   Pin a release tag (or commit SHA). `uses: ./` is only for this repository.
   It does not upload SARIF and does not grant extra `permissions`.
@@ -631,7 +637,7 @@ the CI workflow file. All credentials in tests are fakes.
 
 ```text
 main.py                 entry point (exit code from cli)
-cli/interface.py        argparse, text/JSON output, Git flags, --stdin, --quiet, --min-confidence, --list-patterns
+cli/interface.py        argparse, text/JSON output, Git flags, --stdin, --quiet, --min-confidence, --list-patterns, --only-pattern
 cli/github_action.py    composite-action argv (env → CLI, --no-color)
 cli/dashboard.py        localhost HTML dashboard (127.0.0.1)
 scanner/
