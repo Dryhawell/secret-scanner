@@ -21,6 +21,7 @@ def test_action_yml_is_composite_and_masks_in_logs() -> None:
     assert "github.action_path" in text
     assert 'run: python "$SECRET_SCANNER_ROOT/cli/github_action.py"' in text
     assert "SECRET_SCANNER_PATH: ${{ inputs.path }}" in text
+    assert "SECRET_SCANNER_QUIET: ${{ inputs.quiet }}" in text
     assert "--update-baseline" not in text
     assert "--dashboard" not in text
     assert "--install-hook" not in text
@@ -38,6 +39,7 @@ def test_action_run_line_does_not_interpolate_path_into_shell() -> None:
     assert "${{ inputs.path }}" not in run_line
     assert "${{ inputs.severity }}" not in run_line
     assert "${{ inputs.include-hidden }}" not in run_line
+    assert "${{ inputs.quiet }}" not in run_line
 
 
 def test_product_ci_uses_local_action() -> None:
@@ -67,6 +69,17 @@ def test_argv_always_disables_color_and_never_adds_git_flags() -> None:
         "--stdin",
     ):
         assert banned not in argv
+
+
+def test_argv_quiet_is_opt_in() -> None:
+    argv = argv_from_env({"SECRET_SCANNER_PATH": ".", "SECRET_SCANNER_QUIET": "true"})
+    assert "--quiet" in argv
+    assert "--quiet" not in argv_from_env({"SECRET_SCANNER_PATH": "."})
+
+
+def test_argv_rejects_unknown_quiet() -> None:
+    with pytest.raises(ActionConfigError):
+        argv_from_env({"SECRET_SCANNER_QUIET": "maybe"})
 
 
 def test_argv_rejects_flag_like_path() -> None:

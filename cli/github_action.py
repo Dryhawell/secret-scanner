@@ -47,6 +47,11 @@ def argv_from_env(env: Mapping[str, str]) -> list[str]:
     argv = ["--no-color", "--severity", severity, target]
     if hidden_raw in _HIDDEN_TRUE:
         argv.append("--include-hidden")
+    quiet_raw = env.get("SECRET_SCANNER_QUIET", "false").strip().casefold()
+    if quiet_raw not in _HIDDEN_TRUE | _HIDDEN_FALSE:
+        raise ActionConfigError("quiet must be true or false")
+    if quiet_raw in _HIDDEN_TRUE:
+        argv.append("--quiet")
     return argv
 
 

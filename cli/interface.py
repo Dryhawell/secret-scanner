@@ -74,6 +74,7 @@ examples:
   python main.py . --glob "*.env" --glob "*.py"
   python main.py . --skip-glob "*.min.js"
   python main.py . --no-color
+  python main.py . --quiet
   python main.py . --format json
   python main.py . --output reports/latest.json
   python main.py . --format json -o -
@@ -166,6 +167,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-color",
         action="store_true",
         help="Disable ANSI colors",
+    )
+    parser.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="Suppress the text report (exit code still 1 on findings). "
+        "Does not suppress --output - or error messages.",
     )
     parser.add_argument(
         "--format",
@@ -523,6 +531,8 @@ def emit_json(
     findings: list[SecretFinding],
     output: str | None,
     reports_dir: Path | None = None,
+    *,
+    quiet: bool = False,
 ) -> Path | None:
     """Write JSON to a file, or to stdout when output is '-'."""
     if output == "-":
@@ -535,7 +545,8 @@ def emit_json(
         output=Path(output) if output else None,
         reports_dir=reports_dir or Path("reports"),
     )
-    print(f"Report written: {written.as_posix()}")
+    if not quiet:
+        print(f"Report written: {written.as_posix()}")
     return written
 
 
@@ -545,6 +556,8 @@ def emit_sarif(
     findings: list[SecretFinding],
     output: str | None,
     reports_dir: Path | None = None,
+    *,
+    quiet: bool = False,
 ) -> Path | None:
     """Write SARIF to a file, or to stdout when output is '-'."""
     if output == "-":
@@ -557,7 +570,8 @@ def emit_sarif(
         output=Path(output) if output else None,
         reports_dir=reports_dir or Path("reports"),
     )
-    print(f"Report written: {written.as_posix()}")
+    if not quiet:
+        print(f"Report written: {written.as_posix()}")
     return written
 
 
@@ -567,6 +581,8 @@ def emit_html(
     findings: list[SecretFinding],
     output: str | None,
     reports_dir: Path | None = None,
+    *,
+    quiet: bool = False,
 ) -> Path | None:
     """Write HTML to a file, or to stdout when output is '-'."""
     if output == "-":
@@ -579,7 +595,8 @@ def emit_html(
         output=Path(output) if output else None,
         reports_dir=reports_dir or Path("reports"),
     )
-    print(f"Report written: {written.as_posix()}")
+    if not quiet:
+        print(f"Report written: {written.as_posix()}")
     return written
 
 
@@ -607,6 +624,12 @@ def run(
         if namespace.stdin:
             print(
                 "Error: --dashboard cannot be combined with --stdin",
+                file=sys.stderr,
+            )
+            return 2
+        if namespace.quiet:
+            print(
+                "Error: --dashboard cannot be combined with --quiet",
                 file=sys.stderr,
             )
             return 2
@@ -674,6 +697,7 @@ def run(
     setup_logging(log_file=log_file, verbose=verbose)
     minimum = Severity(namespace.severity or settings.severity or Severity.LOW.value)
     color = _use_color(namespace.no_color or (settings.no_color is True))
+    quiet = namespace.quiet or (settings.quiet is True)
 
     scanner = Scanner(
         config=build_scan_config(namespace, settings),
@@ -751,12 +775,33 @@ def run(
 
     try:
         if format_name == "json":
-            emit_json(result, target, findings, namespace.output, reports_dir=reports_dir)
+            emit_json(
+                result,
+                target,
+                findings,
+                namespace.output,
+                reports_dir=reports_dir,
+                quiet=quiet,
+            )
         elif format_name == "sarif":
-            emit_sarif(result, target, findings, namespace.output, reports_dir=reports_dir)
+            emit_sarif(
+                result,
+                target,
+                findings,
+                namespace.output,
+                reports_dir=reports_dir,
+                quiet=quiet,
+            )
         elif format_name == "html":
-            emit_html(result, target, findings, namespace.output, reports_dir=reports_dir)
-        else:
+            emit_html(
+                result,
+                target,
+                findings,
+                namespace.output,
+                reports_dir=reports_dir,
+                quiet=quiet,
+            )
+        elif not quiet:
             render_text(result, target, findings, color=color)
     except OSError as exc:
         get_logger().error("Unable to write output: %s", exc)
@@ -774,7 +819,8 @@ def run(
             get_logger().error("Unable to write baseline: %s", exc)
             print(f"Error: {exc}", file=sys.stderr)
             return 2
-        print(f"Baseline updated: {written.as_posix()}")
+        if not quiet:
+            print(f"Baseline updated: {written.as_posix()}")
         return 0
 
     if findings:

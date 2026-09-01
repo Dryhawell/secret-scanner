@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.17.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.18.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.17.0
+# Secret Scanner 1.18.0
 ```
 
 ## Why Secret Scanner?
@@ -40,7 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
-- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.17.0`)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.18.0`)
 - `--jobs` worker threads for file scans (default 1)
 - Localhost HTML dashboard (`--dashboard`)
 - Path / finding allowlist (`.secret-scanner-ignore`) and inline `secret-scanner:ignore`
@@ -50,6 +50,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Custom detection regexes in that config (`patterns`)
 - File logging without secret values
 - Exit codes for CI (`0` clean, `1` findings, `2` error)
+- `--quiet` / `-q` (text report off; exit code unchanged)
 
 ## Detection Engine
 
@@ -163,6 +164,7 @@ python main.py [path] [options]
 | `--format text\|json\|sarif\|html` | Terminal text, JSON, SARIF 2.1.0, or HTML under `reports/` |
 | `--output FILE` / `-o -` | Write JSON, SARIF, or HTML to a file, or stdout |
 | `--no-color` | Disable ANSI colors |
+| `--quiet` / `-q` | Suppress the text report (exit code still 1 on findings) |
 | `--verbose` | DEBUG per-file lines in the log file |
 | `--ignore-file FILE` | Allowlist (default: `.secret-scanner-ignore` if present) |
 | `--baseline FILE` | Hashed baseline JSON (default: `.secret-scanner-baseline.json` if present) |
@@ -179,7 +181,7 @@ in pipelines. `--history` walks `git log -p` for the last N commits; deleting a
 file in HEAD does not hide the commit that introduced it. `--since origin/main`
 scans only files in the PR delta (`origin/main...HEAD`); fetch the base ref
 first (`fetch-depth: 0`). `--dashboard` cannot be combined with those Git flags,
-`--stdin`, `--install-hook`, or `--update-baseline`. `--stdin` cannot be
+`--stdin`, `--install-hook`, `--update-baseline`, or `--quiet`. `--stdin` cannot be
 combined with those Git flags, `--dashboard`, or `--install-hook`. A TTY
 (no pipe) with `--stdin` exits 2.
 
@@ -192,6 +194,7 @@ python main.py . --severity HIGH
 python main.py . --exclude dist --exclude build
 python main.py . --glob "*.env" --glob "*.py"
 python main.py . --skip-glob "*.min.js"
+python main.py . --quiet
 python main.py . --staged
 python main.py . --changed
 python main.py . --history
@@ -290,6 +293,7 @@ JSON:
   "skip_glob": ["*.min.js"],
   "include_hidden": false,
   "no_color": true,
+  "quiet": false,
   "format": "text",
   "ignore_file": ".secret-scanner-ignore",
   "baseline": ".secret-scanner-baseline.json",
@@ -513,12 +517,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.17.0
+      - uses: Dryhawell/secret-scanner@v1.18.0
         with:
           include-hidden: true
 ```
 
-Inputs: `path` (default `.`), `include-hidden`, `severity`, `python-version`.
+Inputs: `path` (default `.`), `include-hidden`, `severity`, `python-version`,
+`quiet` (default false; keep false so masked findings stay in the job log).
 The action always passes `--no-color` (Actions logs). It does not run
 `--dashboard`, `--update-baseline`, `--stdin`, or Git scan flags. Put extra
 policy in `.secret-scanner.json` / `.secret-scanner-ignore` in *your* repo.
@@ -552,7 +557,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, parallel file scans, the localhost dashboard, the hook
+and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, parallel file scans, the localhost dashboard, the hook
 installer, project config files, custom patterns, SARIF and HTML reports, and
 the CI workflow file. All credentials in tests are fakes.
 
@@ -599,6 +604,8 @@ the CI workflow file. All credentials in tests are fakes.
 - Detection is never 100% accurate.
 - `--dashboard` is a local helper, not a multi-user app. It does not scan
   Git history. Binding is loopback-only; do not publish the port.
+- `--quiet` hides finding locations from the terminal. The exit code still
+  fails the job; use JSON/SARIF or omit `--quiet` when triaging.
 - The GitHub composite action scans the **caller workspace** after checkout.
   Pin a release tag (or commit SHA). `uses: ./` is only for this repository.
   It does not upload SARIF and does not grant extra `permissions`.
@@ -607,7 +614,7 @@ the CI workflow file. All credentials in tests are fakes.
 
 ```text
 main.py                 entry point (exit code from cli)
-cli/interface.py        argparse, text/JSON output, Git flags, --stdin
+cli/interface.py        argparse, text/JSON output, Git flags, --stdin, --quiet
 cli/github_action.py    composite-action argv (env → CLI, --no-color)
 cli/dashboard.py        localhost HTML dashboard (127.0.0.1)
 scanner/

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.18.0 — 2026-09-01
+
+### Added
+
+- `--quiet` / `-q` suppresses the text report (exit code still 1 on findings)
+- Errors and `--output -` are not suppressed
+- Config key `quiet`; GitHub Action input `quiet` (default false)
+
 ## 1.17.0 — 2026-09-01
 
 ### Added

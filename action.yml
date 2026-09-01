@@ -22,6 +22,10 @@ inputs:
     description: Python version for actions/setup-python (3.11 or newer)
     required: false
     default: "3.12"
+  quiet:
+    description: Suppress the text report (exit code still 1 on findings)
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -38,4 +42,5 @@ runs:
         SECRET_SCANNER_PATH: ${{ inputs.path }}
         SECRET_SCANNER_INCLUDE_HIDDEN: ${{ inputs.include-hidden }}
         SECRET_SCANNER_SEVERITY: ${{ inputs.severity }}
+        SECRET_SCANNER_QUIET: ${{ inputs.quiet }}
       run: python "$SECRET_SCANNER_ROOT/cli/github_action.py"

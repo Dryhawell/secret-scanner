@@ -38,6 +38,7 @@ _ALLOWED_KEYS = frozenset(
         "include_hidden",
         "no_color",
         "verbose",
+        "quiet",
         "format",
         "ignore_file",
         "baseline",
@@ -78,6 +79,7 @@ class FileSettings:
     include_hidden: bool | None = None
     no_color: bool | None = None
     verbose: bool | None = None
+    quiet: bool | None = None
     format: str | None = None
     ignore_file: Path | None = None
     baseline: Path | None = None
@@ -325,6 +327,7 @@ def settings_from_mapping(data: dict[str, object], *, base: Path) -> FileSetting
         include_hidden=_optional_bool(data, "include_hidden"),
         no_color=_optional_bool(data, "no_color"),
         verbose=_optional_bool(data, "verbose"),
+        quiet=_optional_bool(data, "quiet"),
         format=format_name,
         ignore_file=_optional_path(data, "ignore_file", base),
         baseline=_optional_path(data, "baseline", base),
