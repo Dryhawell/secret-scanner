@@ -20,7 +20,15 @@ from scanner.baseline import (
     write_baseline,
 )
 from scanner.confidence import MAX_CONFIDENCE
-from scanner.config_file import ConfigError, FileSettings, load_config_file, resolve_config_path
+from scanner.context import CONTEXTUAL_PATTERN_NAME
+from scanner.config_file import (
+    ConfigError,
+    FileSettings,
+    MAX_SKIP_PATTERNS,
+    load_config_file,
+    resolve_config_path,
+)
+from scanner.entropy import ENTROPY_GATED_PATTERNS, FORMAT_LOCKED_PATTERNS
 from scanner.file_handler import (
     DEFAULT_MAX_FILE_SIZE,
     MAX_JOBS,
@@ -41,12 +49,13 @@ from scanner.history import list_history_lines, path_in_target
 from scanner.hook import HookError, install_pre_commit_hook
 from scanner.ignore import IgnoreError, default_ignore_file, ignore_root, load_ignore_file
 from scanner.models import ScanResult, SecretFinding, Severity
-from scanner.patterns import merged_engine
+from scanner.patterns import PatternEngine, merged_engine
 from scanner.scanner import Scanner
 from scanner.severity import (
     count_by_severity,
     format_severity_counts,
     meets_minimum,
+    severity_for,
     sort_findings,
 )
 from scanner.version import __version__
@@ -71,7 +80,8 @@ examples:
   python main.py .
   python main.py ./src
   python main.py . --severity HIGH
-  python main.py . --min-confidence 80
+  python main.py --list-patterns
+  python main.py . --skip-pattern "Contextual Secret"
   python main.py . --exclude dist --exclude build
   python main.py . --glob "*.env" --glob "*.py"
   python main.py . --skip-glob "*.min.js"
@@ -118,6 +128,11 @@ def build_parser() -> argparse.ArgumentParser:
         version=f"Secret Scanner {__version__}",
     )
     parser.add_argument(
+        "--list-patterns",
+        action="store_true",
+        help="Print built-in (and config custom) rule names and exit. Does not scan.",
+    )
+    parser.add_argument(
         "path",
         nargs="?",
         default=None,
@@ -142,6 +157,14 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="N",
         help="Hide findings with confidence below N (0-99, default: 0 = no extra floor). "
         "Not the same as --severity.",
+    )
+    parser.add_argument(
+        "--skip-pattern",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="Disable a detection rule (repeatable). Names from --list-patterns. "
+        "Skipping a vendor format can still leave a Contextual Secret on the same line.",
     )
     parser.add_argument(
         "--exclude",
@@ -487,6 +510,84 @@ def filter_findings(
     ]
 
 
+class SkipPatternError(ValueError):
+    """Unknown or empty skip-pattern list after validation."""
+
+
+def _entropy_policy_label(name: str) -> str:
+    if name in FORMAT_LOCKED_PATTERNS:
+        return "format-locked"
+    if name in ENTROPY_GATED_PATTERNS:
+        return "entropy-gated"
+    return "custom"
+
+
+def render_pattern_list(engine: PatternEngine, *, color: bool) -> None:
+    """Print rule names for --list-patterns. Does not print regexes."""
+    rows: list[tuple[str, str, str]] = [
+        (pattern.name, pattern.severity.value, _entropy_policy_label(pattern.name))
+        for pattern in engine.patterns
+    ]
+    if CONTEXTUAL_PATTERN_NAME not in {pattern.name for pattern in engine.patterns}:
+        rows.append(
+            (
+                CONTEXTUAL_PATTERN_NAME,
+                severity_for(CONTEXTUAL_PATTERN_NAME).value,
+                _entropy_policy_label(CONTEXTUAL_PATTERN_NAME),
+            )
+        )
+    rows.sort(key=lambda item: item[0].casefold())
+    width = max(len(item[0]) for item in rows)
+    title = _paint("Secret Scanner patterns", _BOLD, color)
+    print(title)
+    for name, severity, policy in rows:
+        print(f"{name:<{width}}  {severity:<8}  {policy}")
+
+
+def known_pattern_names(engine: PatternEngine) -> dict[str, str]:
+    """Map casefolded name → canonical name (builtins, custom, Contextual Secret)."""
+    names = {pattern.name for pattern in engine.patterns}
+    names.add(CONTEXTUAL_PATTERN_NAME)
+    return {name.casefold(): name for name in names}
+
+
+def resolve_skip_patterns(
+    namespace: argparse.Namespace,
+    settings: FileSettings,
+    engine: PatternEngine,
+) -> list[str]:
+    """Canonical skip names. Unknown names raise SkipPatternError."""
+    requested: list[str] = []
+    requested.extend(settings.skip_patterns)
+    requested.extend(namespace.skip_pattern)
+    if not requested:
+        return []
+    if len(requested) > MAX_SKIP_PATTERNS:
+        raise SkipPatternError(
+            f"at most {MAX_SKIP_PATTERNS} skip-pattern names are allowed"
+        )
+    known = known_pattern_names(engine)
+    skip: list[str] = []
+    seen: set[str] = set()
+    for raw in requested:
+        key = raw.strip()
+        if not key:
+            raise SkipPatternError("skip-pattern names must be non-empty")
+        canon = known.get(key.casefold())
+        if canon is None:
+            raise SkipPatternError(
+                f"Unknown pattern {raw!r}. Use --list-patterns for names."
+            )
+        if canon not in seen:
+            seen.add(canon)
+            skip.append(canon)
+    regex_left = any(pattern.name not in seen for pattern in engine.patterns)
+    context_on = CONTEXTUAL_PATTERN_NAME not in seen
+    if not regex_left and not context_on:
+        raise SkipPatternError("all detection rules were skipped")
+    return skip
+
+
 def resolve_min_confidence(
     namespace: argparse.Namespace, settings: FileSettings | None = None
 ) -> int:
@@ -654,6 +755,30 @@ def run(
     stdin_stream: TextIO | None = None
     stdin_label: Path | None = None
 
+    if namespace.list_patterns:
+        if namespace.dashboard:
+            print(
+                "Error: --list-patterns cannot be combined with --dashboard",
+                file=sys.stderr,
+            )
+            return 2
+        config_root = target if target.exists() else Path.cwd()
+        try:
+            config_path = resolve_config_path(namespace.config, config_root)
+            settings = (
+                load_config_file(config_path)
+                if config_path is not None
+                else FileSettings()
+            )
+        except ConfigError as exc:
+            get_logger().error("%s", exc)
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        engine = merged_engine(settings.patterns)
+        color = _use_color(namespace.no_color or (settings.no_color is True))
+        render_pattern_list(engine, color=color)
+        return 0
+
     if namespace.dashboard:
         if namespace.install_hook or namespace.update_baseline:
             print(
@@ -739,10 +864,18 @@ def run(
     color = _use_color(namespace.no_color or (settings.no_color is True))
     quiet = namespace.quiet or (settings.quiet is True)
     confidence_floor = resolve_min_confidence(namespace, settings)
+    engine = merged_engine(settings.patterns)
+    try:
+        skip = resolve_skip_patterns(namespace, settings, engine)
+    except SkipPatternError as exc:
+        get_logger().error("%s", exc)
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
 
     scanner = Scanner(
         config=build_scan_config(namespace, settings),
-        engine=merged_engine(settings.patterns),
+        engine=engine,
+        skip_patterns=skip,
     )
     try:
         apply_ignore_file(scanner.config, namespace, target, settings)

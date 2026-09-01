@@ -44,6 +44,7 @@ _ALLOWED_KEYS = frozenset(
         "ignore_file",
         "baseline",
         "patterns",
+        "skip_patterns",
         "jobs",
     }
 )
@@ -61,6 +62,7 @@ _FORMATS = frozenset({"text", "json", "sarif", "html"})
 MAX_CUSTOM_PATTERNS = 32
 MAX_CUSTOM_REGEX_LENGTH = 512
 MAX_CUSTOM_NAME_LENGTH = 64
+MAX_SKIP_PATTERNS = 32
 _TRUE = frozenset({"true", "yes", "on"})
 _FALSE = frozenset({"false", "no", "off"})
 
@@ -86,6 +88,7 @@ class FileSettings:
     ignore_file: Path | None = None
     baseline: Path | None = None
     patterns: tuple[SecretPattern, ...] = ()
+    skip_patterns: tuple[str, ...] = ()
     jobs: int | None = None
 
 
@@ -335,6 +338,7 @@ def settings_from_mapping(data: dict[str, object], *, base: Path) -> FileSetting
         ignore_file=_optional_path(data, "ignore_file", base),
         baseline=_optional_path(data, "baseline", base),
         patterns=_custom_patterns(data),
+        skip_patterns=tuple(_skip_pattern_list(data)),
         jobs=_optional_jobs(data, "jobs"),
     )
 
@@ -383,6 +387,15 @@ def _string_list(data: dict[str, object], key: str) -> list[str]:
         if not isinstance(item, str) or not item.strip():
             raise ConfigError(f"Config {key} items must be non-empty strings.")
         values.append(item.strip())
+    return values
+
+
+def _skip_pattern_list(data: dict[str, object]) -> list[str]:
+    values = _string_list(data, "skip_patterns")
+    if len(values) > MAX_SKIP_PATTERNS:
+        raise ConfigError(
+            f"Config skip_patterns accepts at most {MAX_SKIP_PATTERNS} names."
+        )
     return values
 
 

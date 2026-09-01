@@ -33,10 +33,11 @@ class Scanner:
         self,
         config: ScanConfig | None = None,
         engine: PatternEngine | None = None,
+        skip_patterns: Sequence[str] | None = None,
     ) -> None:
         self.config = config or ScanConfig()
         self.engine = engine or PatternEngine()
-        self.detector = Detector(engine=self.engine)
+        self.detector = Detector(engine=self.engine, skip_patterns=skip_patterns or ())
 
     def discover_files(self, target: str | Path) -> list[Path]:
         """Return unique scan-candidate files under ``target``."""

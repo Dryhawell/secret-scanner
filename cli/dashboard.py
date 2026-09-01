@@ -276,6 +276,7 @@ def run_dashboard_scan(
         build_scan_config,
         filter_findings,
         resolve_min_confidence,
+        resolve_skip_patterns,
     )
 
     config_path = resolve_config_path(namespace.config, target)
@@ -283,9 +284,12 @@ def run_dashboard_scan(
         load_config_file(config_path) if config_path is not None else FileSettings()
     )
     minimum = Severity(namespace.severity or settings.severity or Severity.LOW.value)
+    engine = merged_engine(settings.patterns)
+    skip = resolve_skip_patterns(namespace, settings, engine)
     scanner = Scanner(
         config=build_scan_config(namespace, settings),
-        engine=merged_engine(settings.patterns),
+        engine=engine,
+        skip_patterns=skip,
     )
     apply_ignore_file(scanner.config, namespace, target, settings)
     apply_baseline(scanner.config, namespace, target, settings)

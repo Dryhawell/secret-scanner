@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.20.0 — 2026-09-01
+
+### Added
+
+- `--list-patterns` prints rule names (no regexes) and exits 0 without scanning
+- `--skip-pattern NAME` disables a rule (repeatable; names are case-insensitive)
+- Config key `skip_patterns`; skipping every rule exits 2
+
 ## 1.19.0 — 2026-09-01
 
 ### Added

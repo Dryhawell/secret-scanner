@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Sequence
 
 from scanner.confidence import calculate_confidence
 from scanner.context import CONTEXTUAL_PATTERN_NAME, find_context_hits
@@ -65,9 +66,11 @@ class Detector:
         self,
         engine: PatternEngine | None = None,
         max_line_length: int = DEFAULT_MAX_LINE_LENGTH,
+        skip_patterns: Sequence[str] | frozenset[str] = (),
     ) -> None:
         self.engine = engine or PatternEngine()
         self.max_line_length = max_line_length
+        self.skip_patterns = frozenset(skip_patterns)
 
     def scan_line(
         self, line: str, file_path: Path, line_number: int, *, commit: str = ""
@@ -82,6 +85,8 @@ class Detector:
         kept_values: set[str] = set()
 
         for match in pattern_matches:
+            if match.pattern_name in self.skip_patterns:
+                continue
             if is_placeholder(match.matched_text):
                 ignored += 1
                 continue
@@ -109,35 +114,36 @@ class Detector:
                 )
             )
 
-        for hit in find_context_hits(line):
-            if is_placeholder(hit.value):
-                ignored += 1
-                continue
-            if is_low_entropy(hit.value):
-                ignored += 1
-                continue
-            if _already_reported(hit.value, kept_values):
-                continue
-            kept_values.add(hit.value)
-            findings.append(
-                SecretFinding(
-                    file_path=file_path,
-                    line_number=line_number,
-                    secret_type=CONTEXTUAL_PATTERN_NAME,
-                    severity=severity_for(CONTEXTUAL_PATTERN_NAME),
-                    masked_value=mask_secret(hit.value),
-                    description=(
-                        f"Sensitive assignment to {hit.identifier!r} "
-                        "without a known vendor-specific secret format."
-                    ),
-                    pattern_name=CONTEXTUAL_PATTERN_NAME,
-                    confidence=calculate_confidence(
-                        CONTEXTUAL_PATTERN_NAME, hit.value, line
-                    ),
-                    fingerprint=secret_id(CONTEXTUAL_PATTERN_NAME, hit.value),
-                    commit=commit,
+        if CONTEXTUAL_PATTERN_NAME not in self.skip_patterns:
+            for hit in find_context_hits(line):
+                if is_placeholder(hit.value):
+                    ignored += 1
+                    continue
+                if is_low_entropy(hit.value):
+                    ignored += 1
+                    continue
+                if _already_reported(hit.value, kept_values):
+                    continue
+                kept_values.add(hit.value)
+                findings.append(
+                    SecretFinding(
+                        file_path=file_path,
+                        line_number=line_number,
+                        secret_type=CONTEXTUAL_PATTERN_NAME,
+                        severity=severity_for(CONTEXTUAL_PATTERN_NAME),
+                        masked_value=mask_secret(hit.value),
+                        description=(
+                            f"Sensitive assignment to {hit.identifier!r} "
+                            "without a known vendor-specific secret format."
+                        ),
+                        pattern_name=CONTEXTUAL_PATTERN_NAME,
+                        confidence=calculate_confidence(
+                            CONTEXTUAL_PATTERN_NAME, hit.value, line
+                        ),
+                        fingerprint=secret_id(CONTEXTUAL_PATTERN_NAME, hit.value),
+                        commit=commit,
+                    )
                 )
-            )
         kept: list[SecretFinding] = []
         inline_ignored = 0
         for finding in findings:
