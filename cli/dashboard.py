@@ -270,7 +270,13 @@ def run_dashboard_scan(
     namespace: argparse.Namespace, target: Path
 ) -> tuple[ScanResult, list[SecretFinding]]:
     """Working-tree scan for one dashboard POST. Findings stay masked."""
-    from cli.interface import apply_baseline, apply_ignore_file, build_scan_config, filter_findings
+    from cli.interface import (
+        apply_baseline,
+        apply_ignore_file,
+        build_scan_config,
+        filter_findings,
+        resolve_min_confidence,
+    )
 
     config_path = resolve_config_path(namespace.config, target)
     settings = (
@@ -285,7 +291,9 @@ def run_dashboard_scan(
     apply_baseline(scanner.config, namespace, target, settings)
     result = scanner.scan(target)
     findings = sort_findings(
-        filter_findings(result.findings, minimum),
+        filter_findings(
+            result.findings, minimum, resolve_min_confidence(namespace, settings)
+        ),
         location_of=lambda item: item.location(root=target),
     )
     return result, findings

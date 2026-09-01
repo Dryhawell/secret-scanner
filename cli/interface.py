@@ -19,6 +19,7 @@ from scanner.baseline import (
     load_baseline,
     write_baseline,
 )
+from scanner.confidence import MAX_CONFIDENCE
 from scanner.config_file import ConfigError, FileSettings, load_config_file, resolve_config_path
 from scanner.file_handler import (
     DEFAULT_MAX_FILE_SIZE,
@@ -70,6 +71,7 @@ examples:
   python main.py .
   python main.py ./src
   python main.py . --severity HIGH
+  python main.py . --min-confidence 80
   python main.py . --exclude dist --exclude build
   python main.py . --glob "*.env" --glob "*.py"
   python main.py . --skip-glob "*.min.js"
@@ -132,6 +134,14 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[item.value for item in Severity],
         default=None,
         help="Minimum severity to report (default: LOW, or the config file)",
+    )
+    parser.add_argument(
+        "--min-confidence",
+        type=_parse_min_confidence,
+        default=None,
+        metavar="N",
+        help="Hide findings with confidence below N (0-99, default: 0 = no extra floor). "
+        "Not the same as --severity.",
     )
     parser.add_argument(
         "--exclude",
@@ -287,6 +297,19 @@ def build_parser() -> argparse.ArgumentParser:
         "CLI flags override file values.",
     )
     return parser
+
+
+def _parse_min_confidence(raw: str) -> int:
+    """Argparse type for --min-confidence. 0 means report every finding."""
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("min-confidence must be an integer") from exc
+    if value < 0 or value > MAX_CONFIDENCE:
+        raise argparse.ArgumentTypeError(
+            f"min-confidence must be between 0 and {MAX_CONFIDENCE}"
+        )
+    return value
 
 
 def _parse_glob(raw: str) -> str:
@@ -454,8 +477,25 @@ def _paint(text: str, code: str, enabled: bool) -> str:
 def filter_findings(
     findings: tuple[SecretFinding, ...] | list[SecretFinding],
     minimum: Severity,
+    min_confidence: int = 0,
 ) -> list[SecretFinding]:
-    return [item for item in findings if meets_minimum(item.severity, minimum)]
+    """Keep findings that meet severity and confidence floors (reporting only)."""
+    return [
+        item
+        for item in findings
+        if meets_minimum(item.severity, minimum) and item.confidence >= min_confidence
+    ]
+
+
+def resolve_min_confidence(
+    namespace: argparse.Namespace, settings: FileSettings | None = None
+) -> int:
+    """CLI wins, then config, else 0 (no extra floor)."""
+    if namespace.min_confidence is not None:
+        return namespace.min_confidence
+    if settings is not None and settings.min_confidence is not None:
+        return settings.min_confidence
+    return 0
 
 
 def render_text(
@@ -698,6 +738,7 @@ def run(
     minimum = Severity(namespace.severity or settings.severity or Severity.LOW.value)
     color = _use_color(namespace.no_color or (settings.no_color is True))
     quiet = namespace.quiet or (settings.quiet is True)
+    confidence_floor = resolve_min_confidence(namespace, settings)
 
     scanner = Scanner(
         config=build_scan_config(namespace, settings),
@@ -767,7 +808,7 @@ def run(
         return 2
 
     findings = sort_findings(
-        filter_findings(result.findings, minimum),
+        filter_findings(result.findings, minimum, confidence_floor),
         location_of=lambda item: item.location(root=target),
     )
 

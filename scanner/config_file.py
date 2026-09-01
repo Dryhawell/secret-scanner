@@ -39,6 +39,7 @@ _ALLOWED_KEYS = frozenset(
         "no_color",
         "verbose",
         "quiet",
+        "min_confidence",
         "format",
         "ignore_file",
         "baseline",
@@ -80,6 +81,7 @@ class FileSettings:
     no_color: bool | None = None
     verbose: bool | None = None
     quiet: bool | None = None
+    min_confidence: int | None = None
     format: str | None = None
     ignore_file: Path | None = None
     baseline: Path | None = None
@@ -328,6 +330,7 @@ def settings_from_mapping(data: dict[str, object], *, base: Path) -> FileSetting
         no_color=_optional_bool(data, "no_color"),
         verbose=_optional_bool(data, "verbose"),
         quiet=_optional_bool(data, "quiet"),
+        min_confidence=_optional_min_confidence(data, "min_confidence"),
         format=format_name,
         ignore_file=_optional_path(data, "ignore_file", base),
         baseline=_optional_path(data, "baseline", base),
@@ -487,6 +490,19 @@ def _required_string(data: dict[str, object], key: str) -> str:
     value = _optional_string(data, key)
     if value is None:
         raise ConfigError(f"Pattern is missing {key}.")
+    return value
+
+
+def _optional_min_confidence(data: dict[str, object], key: str) -> int | None:
+    if key not in data or data[key] is None:
+        return None
+    value = data[key]
+    if isinstance(value, str) and value.isdigit():
+        value = int(value)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ConfigError(f"Config {key} must be an integer 0-99.")
+    if value < 0 or value > 99:
+        raise ConfigError(f"Config {key} must be between 0 and 99.")
     return value
 
 

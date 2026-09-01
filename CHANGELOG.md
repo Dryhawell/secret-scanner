@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.19.0 — 2026-09-01
+
+### Added
+
+- `--min-confidence N` hides findings below a detection-confidence floor (0–99)
+- Config key `min_confidence`; CLI overrides the file
+- This is a report filter, not a detector change (same idea as `--severity`)
+
 ## 1.18.0 — 2026-09-01
 
 ### Added
