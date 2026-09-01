@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.16.0 — 2026-09-01
+
+### Added
+
+- Built-in formats: SendGrid (`SG.`), Twilio (`SK` + hex), Discord webhooks,
+  Azure Storage `AccountKey=`, Shopify (`shpat_` / …), Telegram bots
+- New vendor rules are format-locked (entropy does not drop them)
+
 ## 1.15.0 — 2026-09-01
 
 ### Added

@@ -155,6 +155,56 @@ def test_pypi_token_matches_fake_format() -> None:
     assert "PyPI Token" not in _match_names("pypi-short")
 
 
+def test_sendgrid_key_matches_fake_format() -> None:
+    fake = "SG." + ("A" * 22) + "." + ("B" * 43)
+    assert "SendGrid API Key" in _match_names(fake)
+    assert "SendGrid API Key" not in _match_names("SG.short.short")
+
+
+def test_twilio_key_is_not_stripe_or_openai() -> None:
+    fake = "SK" + ("a" * 32)
+    names = _match_names(fake)
+    assert "Twilio API Key" in names
+    assert "Stripe API Key" not in names
+    assert "OpenAI API Key" not in names
+    assert "Twilio API Key" not in _match_names("SK" + "abcd")
+
+
+def test_discord_webhook_matches_fake_url() -> None:
+    fake = (
+        "https://discord.com/api/webhooks/"
+        + ("1" * 18)
+        + "/"
+        + ("A" * 68)
+    )
+    assert "Discord Webhook" in _match_names(fake)
+    assert "Discord Webhook" not in _match_names(
+        "https://discord.com/api/webhooks/12345/short"
+    )
+    assert "Database Connection String" not in _match_names(fake)
+
+
+def test_azure_storage_key_matches_long_accountkey() -> None:
+    fake = "AccountKey=" + ("A" * 88)
+    assert "Azure Storage Account Key" in _match_names(fake)
+    assert "Azure Storage Account Key" not in _match_names("AccountKey=short")
+    lower = "accountkey=" + ("B" * 88)
+    assert "Azure Storage Account Key" in _match_names(lower)
+
+
+def test_shopify_token_matches_fake_format() -> None:
+    fake = "shpat_" + ("ab" * 16)
+    assert "Shopify Token" in _match_names(fake)
+    assert "Shopify Token" not in _match_names("shpat_" + "ab")
+    assert "Shopify Token" in _match_names("shpss_" + ("cd" * 16))
+
+
+def test_telegram_bot_token_matches_fake_format() -> None:
+    fake = "123456789:AA" + ("B" * 33)
+    assert "Telegram Bot Token" in _match_names(fake)
+    assert "Telegram Bot Token" not in _match_names("123:AAshort")
+
+
 def test_default_catalog_is_non_empty_and_named() -> None:
     patterns = default_patterns()
     names = [pattern.name for pattern in patterns]
@@ -162,3 +212,5 @@ def test_default_catalog_is_non_empty_and_named() -> None:
     assert len(names) == len(set(names))
     assert "GitLab Token" in names
     assert "OpenAI API Key" in names
+    assert "SendGrid API Key" in names
+    assert "Azure Storage Account Key" in names

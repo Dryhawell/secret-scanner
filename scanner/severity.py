@@ -31,6 +31,7 @@ SORT_ORDER: dict[Severity, int] = {
 PATTERN_SEVERITY: dict[str, Severity] = {
     # CRITICAL: material that typically means "assume compromise".
     "AWS Access Key ID": Severity.CRITICAL,
+    "Azure Storage Account Key": Severity.CRITICAL,
     "Private Key": Severity.CRITICAL,
     # HIGH: tokens and keys that grant API or data access.
     "GitHub Token": Severity.HIGH,
@@ -46,6 +47,11 @@ PATTERN_SEVERITY: dict[str, Severity] = {
     "Hugging Face Token": Severity.HIGH,
     "OpenAI API Key": Severity.HIGH,
     "PyPI Token": Severity.HIGH,
+    "SendGrid API Key": Severity.HIGH,
+    "Twilio API Key": Severity.HIGH,
+    "Discord Webhook": Severity.HIGH,
+    "Shopify Token": Severity.HIGH,
+    "Telegram Bot Token": Severity.HIGH,
     # MEDIUM: likely credentials, but often placeholders or local secrets.
     "Generic Password": Severity.MEDIUM,
     # MEDIUM: variable name is sensitive, value has no known vendor format.

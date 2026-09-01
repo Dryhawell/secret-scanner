@@ -36,6 +36,12 @@ FORMAT_LOCKED_PATTERNS: frozenset[str] = frozenset(
         "Hugging Face Token",
         "OpenAI API Key",
         "PyPI Token",
+        "SendGrid API Key",
+        "Twilio API Key",
+        "Discord Webhook",
+        "Azure Storage Account Key",
+        "Shopify Token",
+        "Telegram Bot Token",
     }
 )
 

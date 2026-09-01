@@ -40,6 +40,7 @@ def test_every_default_pattern_has_matching_policy() -> None:
 
 def test_cloud_and_private_key_are_critical() -> None:
     assert severity_for("AWS Access Key ID") is Severity.CRITICAL
+    assert severity_for("Azure Storage Account Key") is Severity.CRITICAL
     assert severity_for("Private Key") is Severity.CRITICAL
 
 
@@ -47,6 +48,8 @@ def test_tokens_and_api_keys_are_high() -> None:
     assert severity_for("GitHub Token") is Severity.HIGH
     assert severity_for("GitLab Token") is Severity.HIGH
     assert severity_for("OpenAI API Key") is Severity.HIGH
+    assert severity_for("SendGrid API Key") is Severity.HIGH
+    assert severity_for("Discord Webhook") is Severity.HIGH
     assert severity_for("Generic API Key") is Severity.HIGH
     assert severity_for("Database Connection String") is Severity.HIGH
     assert severity_for("JWT") is Severity.HIGH

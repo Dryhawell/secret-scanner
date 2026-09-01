@@ -123,6 +123,48 @@ def default_patterns() -> list[SecretPattern]:
             severity=severity_for("PyPI Token"),
             description="PyPI API tokens start with pypi- and a long payload.",
         ),
+        SecretPattern(
+            name="SendGrid API Key",
+            regex=r"(?<![A-Za-z0-9])SG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])",
+            severity=severity_for("SendGrid API Key"),
+            description="SendGrid keys are SG. plus 22 characters, a dot, then 43 characters.",
+        ),
+        SecretPattern(
+            name="Twilio API Key",
+            regex=r"(?<![A-Za-z0-9])SK[0-9a-fA-F]{32}(?![0-9a-fA-F])",
+            severity=severity_for("Twilio API Key"),
+            description="Twilio API keys start with SK and 32 hex digits (not Stripe sk_ or OpenAI sk-).",
+        ),
+        SecretPattern(
+            name="Discord Webhook",
+            regex=(
+                r"https://(?:ptb\.|canary\.)?discord(?:app)?\.com/api/webhooks/"
+                r"\d{5,}/[A-Za-z0-9_-]{40,}"
+            ),
+            severity=severity_for("Discord Webhook"),
+            description="Discord webhook URLs embed the secret in the path; the URL is the credential.",
+            flags=re.IGNORECASE,
+        ),
+        SecretPattern(
+            name="Azure Storage Account Key",
+            regex=r"(?<![A-Za-z0-9])AccountKey=([A-Za-z0-9+/=]{80,})(?![A-Za-z0-9+/=])",
+            severity=severity_for("Azure Storage Account Key"),
+            description="Azure Storage connection strings carry a long Base64 AccountKey.",
+            flags=re.IGNORECASE,
+            value_group=1,
+        ),
+        SecretPattern(
+            name="Shopify Token",
+            regex=r"(?<![A-Za-z0-9])shp(?:at|ss|ca|pa)_[0-9a-fA-F]{32}(?![0-9a-fA-F])",
+            severity=severity_for("Shopify Token"),
+            description="Shopify Admin/storefront tokens use shpat_, shpss_, shpca_, or shppa_ plus 32 hex.",
+        ),
+        SecretPattern(
+            name="Telegram Bot Token",
+            regex=r"(?<![0-9])[0-9]{8,10}:AA[A-Za-z0-9_-]{33}(?![A-Za-z0-9_-])",
+            severity=severity_for("Telegram Bot Token"),
+            description="Telegram bot tokens are a numeric id, a colon, then AA and 33 payload characters.",
+        ),
     ]
 
 
