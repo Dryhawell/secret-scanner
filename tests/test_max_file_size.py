@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from io import StringIO
 from pathlib import Path
 
@@ -111,3 +112,41 @@ def test_stdin_unlimited_allows_default_cap(tmp_path: Path) -> None:
         )
         == 0
     )
+
+
+def test_oversized_skip_is_counted_in_text_and_json(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    src = tmp_path / "src"
+    src.mkdir()
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    payload = f"AWS_ACCESS_KEY_ID = '{aws}'\n" + ("x" * (2 * MIB))
+    (src / "dump.py").write_text(payload, encoding="utf-8")
+    (src / "ok.py").write_text("print('ok')\n", encoding="utf-8")
+    text_code = run(
+        ["--no-color", "--max-file-size", "1", str(src)],
+        log_file=tmp_path / "scan.log",
+        reports_dir=tmp_path / "reports",
+    )
+    text_out = capsys.readouterr().out
+    assert text_code == 0
+    assert "Files skipped (oversize): 1" in text_out
+    json_code = run(
+        [
+            "--no-color",
+            "--max-file-size",
+            "1",
+            "--format",
+            "json",
+            "-o",
+            "-",
+            str(src),
+        ],
+        log_file=tmp_path / "scan.log",
+        reports_dir=tmp_path / "reports",
+    )
+    payload_json = json.loads(capsys.readouterr().out)
+    assert json_code == 0
+    assert payload_json["files_skipped_oversized"] == 1
+    assert payload_json["files_scanned"] == 1
+    assert payload_json["findings_count"] == 0

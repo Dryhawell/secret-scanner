@@ -688,6 +688,7 @@ def render_text(
     print(f"Target: {target}")
     print()
     print(f"Files scanned: {result.files_scanned}")
+    print(f"Files skipped (oversize): {result.files_skipped_oversized}")
     print(f"Lines scanned: {result.lines_scanned:,}")
     print(f"Potential secrets found: {len(findings)}")
     print(f"Placeholders ignored: {result.placeholders_ignored}")

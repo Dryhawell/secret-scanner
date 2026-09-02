@@ -98,6 +98,10 @@ def build_sarif(
                     }
                 },
                 "results": results,
+                "properties": {
+                    "filesScanned": result.files_scanned,
+                    "filesSkippedOversized": result.files_skipped_oversized,
+                },
             }
         ],
     }

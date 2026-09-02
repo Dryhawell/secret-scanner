@@ -257,8 +257,19 @@ def bytes_for_mib(mib: int) -> int | None:
     return mib * MIB
 
 
+@dataclass
+class SkipStats:
+    """Files that passed cheaper filters but were not scanned."""
+
+    oversized: int = 0
+
+
 def should_scan_file(
-    path: Path, config: ScanConfig, *, root: Path | None = None
+    path: Path,
+    config: ScanConfig,
+    *,
+    root: Path | None = None,
+    stats: SkipStats | None = None,
 ) -> bool:
     """Return True if this file should be a scan candidate.
 
@@ -277,13 +288,20 @@ def should_scan_file(
         return False
     if is_oversized_file(path, config):
         _LOG.debug("Skipping oversized file %s", path)
+        if stats is not None:
+            stats.oversized += 1
         return False
     if config.sniff_binary and looks_like_binary(path, config.binary_sniff_bytes):
         return False
     return True
 
 
-def iter_scan_files(root: str | Path, config: ScanConfig | None = None) -> Iterator[Path]:
+def iter_scan_files(
+    root: str | Path,
+    config: ScanConfig | None = None,
+    *,
+    stats: SkipStats | None = None,
+) -> Iterator[Path]:
     """Yield absolute paths of files that are eligible for later scanning.
 
     Directories on the exclude list are not descended into. That is cheaper
@@ -299,7 +317,7 @@ def iter_scan_files(root: str | Path, config: ScanConfig | None = None) -> Itera
 
     if target.is_file():
         parent = target.parent
-        if should_scan_file(target, config, root=parent):
+        if should_scan_file(target, config, root=parent, stats=stats):
             yield target
         return
 
@@ -310,11 +328,15 @@ def iter_scan_files(root: str | Path, config: ScanConfig | None = None) -> Itera
     if is_excluded_directory(target, config):
         return
 
-    yield from _walk_directory(target, config, root=target)
+    yield from _walk_directory(target, config, root=target, stats=stats)
 
 
 def _walk_directory(
-    directory: Path, config: ScanConfig, *, root: Path
+    directory: Path,
+    config: ScanConfig,
+    *,
+    root: Path,
+    stats: SkipStats | None = None,
 ) -> Iterator[Path]:
     """Recursively walk one directory using pathlib, not os.walk."""
     try:
@@ -339,7 +361,7 @@ def _walk_directory(
                 continue
             if _skip_hidden_directory(child, config):
                 continue
-            yield from _walk_directory(child, config, root=root)
+            yield from _walk_directory(child, config, root=root, stats=stats)
         elif is_file:
-            if should_scan_file(child, config, root=root):
+            if should_scan_file(child, config, root=root, stats=stats):
                 yield child.resolve()

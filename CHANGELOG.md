@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.23.0 — 2026-09-02
+
+### Added
+
+- Scan summary counts oversized skipped files (`files_skipped_oversized`)
+- Text, JSON, SARIF, and HTML reports surface the count (not a finding; exit 0)
+
 ## 1.22.0 — 2026-09-02
 
 ### Added

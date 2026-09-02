@@ -116,6 +116,7 @@ class ScanResult:
     placeholders_ignored: int = 0
     allowlist_ignored: int = 0
     baseline_ignored: int = 0
+    files_skipped_oversized: int = 0
 
     @property
     def findings_count(self) -> int:
@@ -137,5 +138,6 @@ class ScanResult:
             "placeholders_ignored": self.placeholders_ignored,
             "allowlist_ignored": self.allowlist_ignored,
             "baseline_ignored": self.baseline_ignored,
+            "files_skipped_oversized": self.files_skipped_oversized,
             "findings": [item.to_dict(root=root) for item in self.findings],
         }

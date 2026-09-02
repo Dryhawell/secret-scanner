@@ -6,6 +6,7 @@ import pytest
 
 from scanner.file_handler import (
     ScanConfig,
+    SkipStats,
     iter_scan_files,
     looks_like_binary,
     matches_glob,
@@ -163,6 +164,20 @@ def test_skips_oversized_text_files(tmp_path: Path) -> None:
     assert _names(found) == {"ok.py"}
     assert not should_scan_file(huge, config)
     assert should_scan_file(small, config)
+
+
+def test_skip_stats_counts_oversized_not_glob_excluded(tmp_path: Path) -> None:
+    small = tmp_path / "ok.py"
+    huge = tmp_path / "dump.txt"
+    skipped = tmp_path / "noise.md"
+    small.write_text("print('ok')\n", encoding="utf-8")
+    huge.write_bytes(b"A" * 200)
+    skipped.write_bytes(b"B" * 200)
+    config = ScanConfig(max_file_size_bytes=50, skip_globs=["*.md"])
+    stats = SkipStats()
+    found = list(iter_scan_files(tmp_path, config, stats=stats))
+    assert _names(found) == {"ok.py"}
+    assert stats.oversized == 1
 
 
 def test_unlimited_size_when_max_file_size_is_none(tmp_path: Path) -> None:

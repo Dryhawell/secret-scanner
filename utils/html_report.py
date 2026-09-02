@@ -77,6 +77,7 @@ def render_findings_block(
     )
     return f"""<div class="cards">
   <div class="card"><strong>{result.files_scanned}</strong><span>Files</span></div>
+  <div class="card"><strong>{result.files_skipped_oversized}</strong><span>Oversize skipped</span></div>
   <div class="card"><strong>{result.lines_scanned}</strong><span>Lines</span></div>
   <div class="card"><strong>{len(findings)}</strong><span>Findings</span></div>
   <div class="card"><strong>{result.placeholders_ignored}</strong><span>Placeholders</span></div>

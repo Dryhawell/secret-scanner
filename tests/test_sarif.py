@@ -52,6 +52,7 @@ def test_sarif_document_has_schema_and_no_snippet(tmp_path: Path) -> None:
     assert hit["locations"][0]["physicalLocation"]["region"]["startLine"] == 3
     assert "snippet" not in json.dumps(payload)
     assert "AKIA****************" in hit["message"]["text"]
+    assert run0["properties"]["filesSkippedOversized"] == 0
 
 
 def test_write_sarif_omits_plaintext(tmp_path: Path) -> None:

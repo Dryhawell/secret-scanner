@@ -11,6 +11,7 @@ from scanner.baseline import is_baselined
 from scanner.detector import Detector, FileScan
 from scanner.file_handler import (
     ScanConfig,
+    SkipStats,
     has_excluded_extension,
     iter_scan_files,
     passes_glob_filters,
@@ -39,11 +40,13 @@ class Scanner:
         self.engine = engine or PatternEngine()
         self.detector = Detector(engine=self.engine, skip_patterns=skip_patterns or ())
 
-    def discover_files(self, target: str | Path) -> list[Path]:
+    def discover_files(
+        self, target: str | Path, *, stats: SkipStats | None = None
+    ) -> list[Path]:
         """Return unique scan-candidate files under ``target``."""
         seen: set[Path] = set()
         unique: list[Path] = []
-        for path in iter_scan_files(target, self.config):
+        for path in iter_scan_files(target, self.config, stats=stats):
             if path in seen:
                 continue
             if is_ignored_path(path, ignore_root(Path(target)), self.config.ignore_paths):
@@ -59,11 +62,12 @@ class Scanner:
         _LOG.info("Scan started (explicit paths): %s", target)
         unique: list[Path] = []
         seen: set[Path] = set()
+        stats = SkipStats()
         for path in paths:
             resolved = path.expanduser().resolve()
             if resolved in seen:
                 continue
-            if not should_scan_file(resolved, self.config, root=target):
+            if not should_scan_file(resolved, self.config, root=target, stats=stats):
                 continue
             if is_ignored_path(resolved, ignore_root(target), self.config.ignore_paths):
                 _LOG.debug("Allowlist skipped file %s", resolved)
@@ -71,7 +75,9 @@ class Scanner:
             seen.add(resolved)
             unique.append(resolved)
         _LOG.info("Discovered %s candidate file(s)", len(unique))
-        return self._scan_file_list(unique, target=target, started_at=started_at)
+        return self._scan_file_list(
+            unique, target=target, started_at=started_at, skip_stats=stats
+        )
 
     def scan(self, target: str | Path) -> ScanResult:
         """Discover files, detect secrets, return a structured result.
@@ -82,9 +88,12 @@ class Scanner:
         started_at = datetime.now(timezone.utc)
         root = Path(target).expanduser()
         _LOG.info("Scan started: %s", root)
-        files = self.discover_files(root)
+        stats = SkipStats()
+        files = self.discover_files(root, stats=stats)
         _LOG.info("Discovered %s candidate file(s)", len(files))
-        return self._scan_file_list(files, target=root, started_at=started_at)
+        return self._scan_file_list(
+            files, target=root, started_at=started_at, skip_stats=stats
+        )
 
     def scan_text(self, text: str, *, virtual_path: Path, target: Path) -> ScanResult:
         """Scan an in-memory buffer (stdin). ``text`` is not logged."""
@@ -235,6 +244,7 @@ class Scanner:
         *,
         target: Path,
         started_at: datetime,
+        skip_stats: SkipStats | None = None,
     ) -> ScanResult:
         findings: list[SecretFinding] = []
         lines_scanned = 0
@@ -283,13 +293,14 @@ class Scanner:
         resolved = resolved.resolve() if resolved.exists() else resolved
         finished_at = datetime.now(timezone.utc)
         _LOG.info(
-            "Scan completed: files=%s lines=%s findings=%s ignored=%s allowlist=%s baseline=%s",
+            "Scan completed: files=%s lines=%s findings=%s ignored=%s allowlist=%s baseline=%s oversized=%s",
             len(files),
             lines_scanned,
             len(findings),
             placeholders_ignored,
             allowlist_ignored,
             baseline_ignored,
+            skip_stats.oversized if skip_stats is not None else 0,
         )
         return ScanResult(
             target=resolved,
@@ -301,4 +312,7 @@ class Scanner:
             placeholders_ignored=placeholders_ignored,
             allowlist_ignored=allowlist_ignored,
             baseline_ignored=baseline_ignored,
+            files_skipped_oversized=(
+                skip_stats.oversized if skip_stats is not None else 0
+            ),
         )
