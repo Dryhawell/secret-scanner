@@ -46,12 +46,16 @@ PATTERN_SEVERITY: dict[str, Severity] = {
     "npm Token": Severity.HIGH,
     "Hugging Face Token": Severity.HIGH,
     "OpenAI API Key": Severity.HIGH,
+    "Anthropic API Key": Severity.HIGH,
     "PyPI Token": Severity.HIGH,
     "SendGrid API Key": Severity.HIGH,
     "Twilio API Key": Severity.HIGH,
     "Discord Webhook": Severity.HIGH,
     "Shopify Token": Severity.HIGH,
     "Telegram Bot Token": Severity.HIGH,
+    "Slack Webhook": Severity.HIGH,
+    "DigitalOcean Token": Severity.HIGH,
+    "Stripe Webhook Secret": Severity.HIGH,
     # MEDIUM: likely credentials, but often placeholders or local secrets.
     "Generic Password": Severity.MEDIUM,
     # MEDIUM: variable name is sensitive, value has no known vendor format.

@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.26.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.27.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.26.0
+# Secret Scanner 1.27.0
 ```
 
 ## Why Secret Scanner?
@@ -40,7 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
-- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.26.0`)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.27.0`)
 - `--jobs` worker threads for file scans (default 1)
 - Localhost HTML dashboard (`--dashboard`)
 - Path / finding allowlist (`.secret-scanner-ignore`) and inline `secret-scanner:ignore`
@@ -67,8 +67,9 @@ The pipeline is **pattern + context + placeholder filter + entropy (gated)**.
    Hidden *directories* (`.github`) are skipped unless `--include-hidden`.
    Hidden *files* such as `.env` are still scanned.
 2. **Format patterns** — public prefixes and shapes (`AKIA…`, `ghp_`, `glpat-`,
-   `xoxb-`, `npm_`, `hf_`, `sk-`, `SG.`, `shpat_`, PEM headers, JWTs, Stripe
-   `sk_live_`, Azure `AccountKey=`, Discord webhooks, …).
+   `xoxb-`, `npm_`, `hf_`, `sk-`, `sk-ant-`, `SG.`, `shpat_`, `dop_v1_`,
+   `whsec_`, PEM headers, JWTs, Stripe `sk_live_`, Azure `AccountKey=`,
+   Discord / Slack webhooks, …).
 3. **Context** — sensitive names (`password`, `token`, `api_key`, …) with a
    long-enough value that has no vendor prefix.
 4. **Placeholder filter** — `YOUR_API_KEY`, `changeme`, `example`, and similar
@@ -99,15 +100,19 @@ AWS key (typical score around 90).
 | Stripe API Key | HIGH |
 | GitLab Token (`glpat-`) | HIGH |
 | Slack Token (`xoxb-` / `xoxp-` / …) | HIGH |
+| Slack Webhook URL | HIGH |
 | npm Token (`npm_`) | HIGH |
 | Hugging Face Token (`hf_`) | HIGH |
-| OpenAI API Key (`sk-`, not Stripe `sk_`) | HIGH |
+| OpenAI API Key (`sk-`, not Stripe `sk_` or Anthropic `sk-ant-`) | HIGH |
+| Anthropic API Key (`sk-ant-`) | HIGH |
 | PyPI Token (`pypi-`) | HIGH |
 | SendGrid API Key (`SG.`) | HIGH |
 | Twilio API Key (`SK` + hex, not Stripe `sk_` / OpenAI `sk-`) | HIGH |
 | Discord Webhook URL | HIGH |
 | Azure Storage Account Key (`AccountKey=`) | CRITICAL |
 | Shopify Token (`shpat_` / `shpss_` / …) | HIGH |
+| DigitalOcean Token (`dop_v1_`) | HIGH |
+| Stripe Webhook Secret (`whsec_`) | HIGH |
 | Telegram Bot Token | HIGH |
 | JWT | HIGH |
 | Generic API Key assignment | HIGH |
@@ -548,7 +553,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.26.0
+      - uses: Dryhawell/secret-scanner@v1.27.0
         with:
           include-hidden: true
           fail-on-severity: HIGH
@@ -568,7 +573,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.26.0
+      - uses: Dryhawell/secret-scanner@v1.27.0
         with:
           include-hidden: true
           sarif: true

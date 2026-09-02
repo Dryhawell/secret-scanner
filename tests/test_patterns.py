@@ -143,6 +143,7 @@ def test_openai_key_is_not_stripe() -> None:
     names = _match_names(fake)
     assert "OpenAI API Key" in names
     assert "Stripe API Key" not in names
+    assert "Anthropic API Key" not in names
     stripe = "sk_test_" + "TESTPLACEHOLDER000000"
     names = _match_names(stripe)
     assert "Stripe API Key" in names
@@ -205,6 +206,52 @@ def test_telegram_bot_token_matches_fake_format() -> None:
     assert "Telegram Bot Token" not in _match_names("123:AAshort")
 
 
+def test_anthropic_key_is_not_openai_or_stripe() -> None:
+    fake = "sk-ant-" + "TESTPLACEHOLDERKEY00"
+    names = _match_names(fake)
+    assert "Anthropic API Key" in names
+    assert "OpenAI API Key" not in names
+    assert "Stripe API Key" not in names
+    openai = "sk-" + "TESTOPENAIPLACEHOLDER00"
+    names = _match_names(openai)
+    assert "OpenAI API Key" in names
+    assert "Anthropic API Key" not in names
+
+
+def test_slack_webhook_matches_fake_url() -> None:
+    fake = (
+        "https://hooks.slack.com/services/"
+        + "T"
+        + ("0" * 8)
+        + "/B"
+        + ("1" * 8)
+        + "/"
+        + ("A" * 24)
+    )
+    names = _match_names(fake)
+    assert "Slack Webhook" in names
+    assert "Slack Token" not in names
+    assert "Database Connection String" not in names
+    assert "Discord Webhook" not in names
+    assert "Slack Webhook" not in _match_names(
+        "https://hooks.slack.com/services/T00/B00/short"
+    )
+
+
+def test_digitalocean_token_matches_fake_format() -> None:
+    fake = "dop_v1_" + ("a" * 64)
+    assert "DigitalOcean Token" in _match_names(fake)
+    assert "DigitalOcean Token" not in _match_names("dop_v1_" + "ab")
+
+
+def test_stripe_webhook_secret_is_not_api_key() -> None:
+    fake = "whsec_" + "TESTPLACEHOLDER0000"
+    names = _match_names(fake)
+    assert "Stripe Webhook Secret" in names
+    assert "Stripe API Key" not in names
+    assert "Stripe Webhook Secret" not in _match_names("whsec_short")
+
+
 def test_default_catalog_is_non_empty_and_named() -> None:
     patterns = default_patterns()
     names = [pattern.name for pattern in patterns]
@@ -214,3 +261,7 @@ def test_default_catalog_is_non_empty_and_named() -> None:
     assert "OpenAI API Key" in names
     assert "SendGrid API Key" in names
     assert "Azure Storage Account Key" in names
+    assert "Anthropic API Key" in names
+    assert "Slack Webhook" in names
+    assert "DigitalOcean Token" in names
+    assert "Stripe Webhook Secret" in names

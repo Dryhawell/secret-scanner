@@ -113,9 +113,9 @@ def default_patterns() -> list[SecretPattern]:
         ),
         SecretPattern(
             name="OpenAI API Key",
-            regex=r"(?<![A-Za-z0-9])sk-[A-Za-z0-9-]{20,}(?![A-Za-z0-9-])",
+            regex=r"(?<![A-Za-z0-9])sk-(?!ant-)[A-Za-z0-9-]{20,}(?![A-Za-z0-9-])",
             severity=severity_for("OpenAI API Key"),
-            description="OpenAI keys use sk- (hyphen). Stripe live/test keys use sk_ and are a different rule.",
+            description="OpenAI keys use sk- (hyphen), not Stripe sk_ or Anthropic sk-ant-.",
         ),
         SecretPattern(
             name="PyPI Token",
@@ -164,6 +164,34 @@ def default_patterns() -> list[SecretPattern]:
             regex=r"(?<![0-9])[0-9]{8,10}:AA[A-Za-z0-9_-]{33}(?![A-Za-z0-9_-])",
             severity=severity_for("Telegram Bot Token"),
             description="Telegram bot tokens are a numeric id, a colon, then AA and 33 payload characters.",
+        ),
+        SecretPattern(
+            name="Anthropic API Key",
+            regex=r"(?<![A-Za-z0-9])sk-ant-[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])",
+            severity=severity_for("Anthropic API Key"),
+            description="Anthropic keys start with sk-ant- (not OpenAI sk- or Stripe sk_).",
+        ),
+        SecretPattern(
+            name="Slack Webhook",
+            regex=(
+                r"https://hooks\.slack\.com/services/"
+                r"T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{16,}"
+            ),
+            severity=severity_for("Slack Webhook"),
+            description="Slack incoming webhook URLs embed the secret in the path; the URL is the credential.",
+            flags=re.IGNORECASE,
+        ),
+        SecretPattern(
+            name="DigitalOcean Token",
+            regex=r"(?<![A-Za-z0-9])dop_v1_[a-fA-F0-9]{64}(?![a-fA-F0-9])",
+            severity=severity_for("DigitalOcean Token"),
+            description="DigitalOcean personal access tokens start with dop_v1_ and 64 hex digits.",
+        ),
+        SecretPattern(
+            name="Stripe Webhook Secret",
+            regex=r"(?<![A-Za-z0-9])whsec_[A-Za-z0-9+/=]{16,}(?![A-Za-z0-9+/=])",
+            severity=severity_for("Stripe Webhook Secret"),
+            description="Stripe webhook signing secrets start with whsec_ (not sk_live_ API keys).",
         ),
     ]
 

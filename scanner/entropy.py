@@ -42,6 +42,10 @@ FORMAT_LOCKED_PATTERNS: frozenset[str] = frozenset(
         "Azure Storage Account Key",
         "Shopify Token",
         "Telegram Bot Token",
+        "Anthropic API Key",
+        "Slack Webhook",
+        "DigitalOcean Token",
+        "Stripe Webhook Secret",
     }
 )
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.27.0 — 2026-09-02
+
+### Added
+
+- Built-in formats: Anthropic (`sk-ant-`), Slack incoming webhooks,
+  DigitalOcean (`dop_v1_` + hex), Stripe webhook secrets (`whsec_`)
+- OpenAI `sk-` no longer matches Anthropic `sk-ant-`
+
 ## 1.26.0 — 2026-09-02
 
 ### Added
