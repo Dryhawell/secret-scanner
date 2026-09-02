@@ -293,7 +293,7 @@ class Scanner:
         resolved = resolved.resolve() if resolved.exists() else resolved
         finished_at = datetime.now(timezone.utc)
         _LOG.info(
-            "Scan completed: files=%s lines=%s findings=%s ignored=%s allowlist=%s baseline=%s oversized=%s",
+            "Scan completed: files=%s lines=%s findings=%s ignored=%s allowlist=%s baseline=%s oversized=%s binary=%s",
             len(files),
             lines_scanned,
             len(findings),
@@ -301,6 +301,7 @@ class Scanner:
             allowlist_ignored,
             baseline_ignored,
             skip_stats.oversized if skip_stats is not None else 0,
+            skip_stats.binary if skip_stats is not None else 0,
         )
         return ScanResult(
             target=resolved,
@@ -314,5 +315,8 @@ class Scanner:
             baseline_ignored=baseline_ignored,
             files_skipped_oversized=(
                 skip_stats.oversized if skip_stats is not None else 0
+            ),
+            files_skipped_binary=(
+                skip_stats.binary if skip_stats is not None else 0
             ),
         )

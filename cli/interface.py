@@ -719,6 +719,7 @@ def render_text(
     print()
     print(f"Files scanned: {result.files_scanned}")
     print(f"Files skipped (oversize): {result.files_skipped_oversized}")
+    print(f"Files skipped (binary): {result.files_skipped_binary}")
     print(f"Lines scanned: {result.lines_scanned:,}")
     print(f"Potential secrets found: {len(findings)}")
     print(f"Fail-on severity: {fail_on.value}")

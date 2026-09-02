@@ -42,6 +42,7 @@ def test_json_payload_has_required_keys_and_masked_values(tmp_path: Path) -> Non
     payload = json.loads(dumps_report(result, [finding], tmp_path))
     assert payload["files_scanned"] == 1
     assert payload["files_skipped_oversized"] == 0
+    assert payload["files_skipped_binary"] == 0
     assert payload["findings_count"] == 1
     assert "scan_time" in payload
     assert payload["findings"][0]["masked_value"] == "AKIA****************"

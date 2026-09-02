@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.28.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.29.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.28.0
+# Secret Scanner 1.29.0
 ```
 
 ## Why Secret Scanner?
@@ -40,7 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
-- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.28.0`)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.29.0`)
 - `--jobs` worker threads for file scans (default 1)
 - Localhost HTML dashboard (`--dashboard`)
 - Path / finding allowlist (`.secret-scanner-ignore`) and inline `secret-scanner:ignore`
@@ -57,6 +57,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - `--max-file-size N` (mebibytes; `0` = unlimited)
 - GitHub Action input `max-file-size` (empty = CLI default 5 MiB)
 - Oversized-file skip count in the scan summary
+- Binary-file skip count in the scan summary (NUL sniff, not extension skips)
 - GitHub Action opt-in SARIF upload (`sarif: true`)
 
 ## Detection Engine
@@ -430,6 +431,7 @@ findings. `reports/*.sarif` is gitignored the same way. Payload shape (no plaint
   "scan_time": "2026-08-29T09:00:00+00:00",
   "files_scanned": 142,
   "files_skipped_oversized": 0,
+  "files_skipped_binary": 0,
   "lines_scanned": 28421,
   "findings_count": 1,
   "placeholders_ignored": 5,
@@ -554,7 +556,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.28.0
+      - uses: Dryhawell/secret-scanner@v1.29.0
         with:
           include-hidden: true
           fail-on-severity: HIGH
@@ -575,7 +577,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.28.0
+      - uses: Dryhawell/secret-scanner@v1.29.0
         with:
           include-hidden: true
           sarif: true
@@ -622,7 +624,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, `--max-file-size`, oversized skip counts, GitHub Action SARIF upload, `--fail-on-severity`, GitHub Action `max-file-size`, parallel file scans, the localhost dashboard, the hook
+and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, `--max-file-size`, oversized skip counts, binary skip counts, GitHub Action SARIF upload, `--fail-on-severity`, GitHub Action `max-file-size`, parallel file scans, the localhost dashboard, the hook
 installer, project config files, custom patterns, SARIF and HTML reports, and
 the CI workflow file. All credentials in tests are fakes.
 
@@ -641,9 +643,12 @@ the CI workflow file. All credentials in tests are fakes.
   a merge may be missed.
 - Files larger than `--max-file-size` (default 5 MiB) and skipped binaries
   are not scanned (false negatives by design, for performance). Oversized
-  skips are counted in the summary (`files_skipped_oversized`); they are
-  not findings and do not change the exit code. `--verbose` logs the path.
-  `0` removes the cap and can freeze a regex on a huge dump.
+  skips are counted in the summary (`files_skipped_oversized`). NUL-sniffed
+  binaries are counted separately (`files_skipped_binary`); known binary
+  extensions (`.png`, `.zip`, …) are not, because they never entered the
+  sniff path. Neither count is a finding or an exit-code change.
+  `--verbose` logs the path. `0` removes the cap and can freeze a regex
+  on a huge dump.
 - `--glob` / `--skip-glob` use `fnmatch`, not gitignore. A name pattern
   (`*.py`) matches the file name in any folder. A pattern with `/` is
   relative to the scan root; `*` there can match across directories.

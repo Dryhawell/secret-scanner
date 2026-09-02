@@ -262,6 +262,7 @@ class SkipStats:
     """Files that passed cheaper filters but were not scanned."""
 
     oversized: int = 0
+    binary: int = 0
 
 
 def should_scan_file(
@@ -292,6 +293,9 @@ def should_scan_file(
             stats.oversized += 1
         return False
     if config.sniff_binary and looks_like_binary(path, config.binary_sniff_bytes):
+        _LOG.debug("Skipping binary file %s", path)
+        if stats is not None:
+            stats.binary += 1
         return False
     return True
 

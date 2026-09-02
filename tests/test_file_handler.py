@@ -180,6 +180,33 @@ def test_skip_stats_counts_oversized_not_glob_excluded(tmp_path: Path) -> None:
     assert stats.oversized == 1
 
 
+def test_skip_stats_counts_nul_sniff_not_extension_or_glob(tmp_path: Path) -> None:
+    small = tmp_path / "ok.py"
+    sniffed = tmp_path / "blob.dat"
+    photo = tmp_path / "photo.png"
+    skipped = tmp_path / "noise.bin"
+    small.write_text("print('ok')\n", encoding="utf-8")
+    sniffed.write_bytes(b"hello\x00world")
+    photo.write_bytes(b"\x89PNG\x00")
+    skipped.write_bytes(b"skip\x00me")
+    config = ScanConfig(skip_globs=["*.bin"])
+    stats = SkipStats()
+    found = list(iter_scan_files(tmp_path, config, stats=stats))
+    assert _names(found) == {"ok.py"}
+    assert stats.binary == 1
+    assert stats.oversized == 0
+
+
+def test_skip_stats_oversized_wins_over_binary_sniff(tmp_path: Path) -> None:
+    huge = tmp_path / "dump.dat"
+    huge.write_bytes(b"A" * 200 + b"\x00")
+    config = ScanConfig(max_file_size_bytes=50)
+    stats = SkipStats()
+    assert not should_scan_file(huge, config, stats=stats)
+    assert stats.oversized == 1
+    assert stats.binary == 0
+
+
 def test_unlimited_size_when_max_file_size_is_none(tmp_path: Path) -> None:
     huge = tmp_path / "dump.txt"
     huge.write_bytes(b"A" * 200)

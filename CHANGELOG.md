@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.29.0 — 2026-09-02
+
+### Added
+
+- Scan summary counts NUL-sniffed binary skips (`files_skipped_binary`)
+- Text, JSON, SARIF, and HTML reports surface the count (not a finding; exit 0)
+- Known binary extensions and glob-excluded files are not counted
+
 ## 1.28.0 — 2026-09-02
 
 ### Added

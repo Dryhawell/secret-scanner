@@ -101,6 +101,7 @@ def build_sarif(
                 "properties": {
                     "filesScanned": result.files_scanned,
                     "filesSkippedOversized": result.files_skipped_oversized,
+                    "filesSkippedBinary": result.files_skipped_binary,
                 },
             }
         ],

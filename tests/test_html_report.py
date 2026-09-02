@@ -50,6 +50,7 @@ def test_html_empty_state(tmp_path: Path) -> None:
     page = render_html(result, [], tmp_path)
     assert "No potential secrets found." in page
     assert "Oversize skipped" in page
+    assert "Binary skipped" in page
 
 
 def test_write_html_omits_plaintext(tmp_path: Path) -> None:
