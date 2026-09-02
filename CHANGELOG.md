@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.25.0 — 2026-09-02
+
+### Added
+
+- `--fail-on-severity` is the CI exit gate (default: same as `--severity`)
+- Config key `fail_on_severity`; CLI overrides. Findings below the gate can still be reported
+
 ## 1.24.0 — 2026-09-02
 
 ### Added

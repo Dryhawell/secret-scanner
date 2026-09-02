@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.24.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.25.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.24.0
+# Secret Scanner 1.25.0
 ```
 
 ## Why Secret Scanner?
@@ -40,7 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
-- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.24.0`)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.25.0`)
 - `--jobs` worker threads for file scans (default 1)
 - Localhost HTML dashboard (`--dashboard`)
 - Path / finding allowlist (`.secret-scanner-ignore`) and inline `secret-scanner:ignore`
@@ -52,6 +52,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Exit codes for CI (`0` clean, `1` findings, `2` error)
 - `--quiet` / `-q` (text report off; exit code unchanged)
 - `--min-confidence` report filter (not a detector change)
+- `--fail-on-severity` CI exit gate (default: same as `--severity`)
 - `--list-patterns`, `--skip-pattern`, and `--only-pattern`
 - `--max-file-size N` (mebibytes; `0` = unlimited)
 - Oversized-file skip count in the scan summary
@@ -154,6 +155,7 @@ python main.py [path] [options]
 | Flag | Meaning |
 |---|---|
 | `--severity LOW\|MEDIUM\|HIGH\|CRITICAL` | Minimum severity to report (default: LOW) |
+| `--fail-on-severity LOW\|MEDIUM\|HIGH\|CRITICAL` | Exit 1 only if a reported finding meets this (default: same as `--severity`) |
 | `--min-confidence N` | Hide findings with confidence below N (0–99, default 0) |
 | `--list-patterns` | Print rule names (no regexes) and exit; does not scan |
 | `--skip-pattern NAME` | Disable a detection rule (repeatable). See `--list-patterns` |
@@ -204,6 +206,7 @@ combined with those Git flags, `--dashboard`, or `--install-hook`. A TTY
 python main.py .
 python main.py ./src
 python main.py . --severity HIGH
+python main.py . --fail-on-severity HIGH
 python main.py . --min-confidence 80
 python main.py --list-patterns
 python main.py . --skip-pattern "Contextual Secret"
@@ -301,6 +304,7 @@ to the scan root. `--config FILE` must exist when given (exit `2` if missing).
 CLI flags override the file. Relative `ignore_file` / `baseline` paths are
 resolved from the config file's directory. `jobs` is a worker-thread count
 (`0` = CPU count). `max_file_size` is a mebibyte cap (`0` = unlimited).
+`fail_on_severity` is the CI exit gate (default: same as `severity`).
 
 JSON:
 
@@ -321,6 +325,7 @@ JSON:
   "baseline": ".secret-scanner-baseline.json",
   "jobs": 4,
   "max_file_size": 5,
+  "fail_on_severity": "HIGH",
   "patterns": [
     {
       "name": "Internal Token",
@@ -528,7 +533,7 @@ Exit codes (the language of CI):
 | Code | Meaning |
 |---|---|
 | 0 | No findings after severity filter |
-| 1 | Findings reported — fail the job |
+| 1 | Findings at `--fail-on-severity` (default: any reported finding) |
 | 2 | Scanner error (missing path, not a Git repo, …) |
 
 Other repositories (pin a **tag**, not `@main`):
@@ -543,7 +548,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.24.0
+      - uses: Dryhawell/secret-scanner@v1.25.0
         with:
           include-hidden: true
 ```
@@ -562,7 +567,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.24.0
+      - uses: Dryhawell/secret-scanner@v1.25.0
         with:
           include-hidden: true
           sarif: true
@@ -607,7 +612,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, `--max-file-size`, oversized skip counts, GitHub Action SARIF upload, parallel file scans, the localhost dashboard, the hook
+and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, `--max-file-size`, oversized skip counts, GitHub Action SARIF upload, `--fail-on-severity`, parallel file scans, the localhost dashboard, the hook
 installer, project config files, custom patterns, SARIF and HTML reports, and
 the CI workflow file. All credentials in tests are fakes.
 
@@ -661,6 +666,9 @@ the CI workflow file. All credentials in tests are fakes.
   fails the job; use JSON/SARIF or omit `--quiet` when triaging.
 - `--min-confidence` is a report filter. Raising it hides contextual noise
   and can also hide format-locked vendor hits whose score is below the floor.
+- `--fail-on-severity` is an exit policy, not a detector change. Findings
+  below the gate can still be printed (and written to JSON/SARIF). `--quiet`
+  hides the “exiting 0” line; the exit code is the CI signal.
 - `--skip-pattern` disables a detector, not a single finding. Skipping a
   vendor format can still leave a Contextual Secret on the same line.
   It is not a substitute for rotation.
@@ -677,7 +685,7 @@ the CI workflow file. All credentials in tests are fakes.
 
 ```text
 main.py                 entry point (exit code from cli)
-cli/interface.py        argparse, text/JSON output, Git flags, --stdin, --quiet, --min-confidence, --list-patterns, --only-pattern, --max-file-size
+cli/interface.py        argparse, text/JSON output, Git flags, --stdin, --quiet, --min-confidence, --fail-on-severity, --list-patterns, --only-pattern, --max-file-size
 cli/github_action.py    composite-action argv (env → CLI, --no-color, optional SARIF)
 cli/dashboard.py        localhost HTML dashboard (127.0.0.1)
 scanner/

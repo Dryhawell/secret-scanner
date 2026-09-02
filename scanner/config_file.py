@@ -55,6 +55,7 @@ _ALLOWED_KEYS = frozenset(
         "only_patterns",
         "jobs",
         "max_file_size",
+        "fail_on_severity",
     }
 )
 _PATTERN_KEYS = frozenset(
@@ -101,6 +102,7 @@ class FileSettings:
     only_patterns: tuple[str, ...] = ()
     jobs: int | None = None
     max_file_size: int | None = None
+    fail_on_severity: str | None = None
 
 
 def default_config_file(target: Path) -> Path | None:
@@ -318,14 +320,8 @@ def settings_from_mapping(data: dict[str, object], *, base: Path) -> FileSetting
             + ". Allowed: "
             + ", ".join(sorted(_ALLOWED_KEYS))
         )
-    severity = _optional_string(data, "severity")
-    if severity is not None:
-        allowed = {item.value for item in Severity}
-        if severity not in allowed:
-            raise ConfigError(
-                f"Invalid severity {severity!r}. Expected one of: "
-                + ", ".join(item.value for item in Severity)
-            )
+    severity = _optional_severity_name(data, "severity")
+    fail_on_severity = _optional_severity_name(data, "fail_on_severity")
     format_name = _optional_string(data, "format")
     if format_name is not None:
         folded = format_name.casefold()
@@ -353,6 +349,7 @@ def settings_from_mapping(data: dict[str, object], *, base: Path) -> FileSetting
         only_patterns=tuple(_named_pattern_list(data, "only_patterns")),
         jobs=_optional_jobs(data, "jobs"),
         max_file_size=_optional_max_file_size(data, "max_file_size"),
+        fail_on_severity=fail_on_severity,
     )
 
 
@@ -363,6 +360,19 @@ def _optional_string(data: dict[str, object], key: str) -> str | None:
     if not isinstance(value, str) or not value.strip():
         raise ConfigError(f"Config {key} must be a non-empty string.")
     return value.strip()
+
+
+def _optional_severity_name(data: dict[str, object], key: str) -> str | None:
+    value = _optional_string(data, key)
+    if value is None:
+        return None
+    allowed = {item.value for item in Severity}
+    if value not in allowed:
+        raise ConfigError(
+            f"Invalid {key} {value!r}. Expected one of: "
+            + ", ".join(item.value for item in Severity)
+        )
+    return value
 
 
 def _optional_bool(data: dict[str, object], key: str) -> bool | None:

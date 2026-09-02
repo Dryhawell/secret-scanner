@@ -83,6 +83,7 @@ examples:
   python main.py .
   python main.py ./src
   python main.py . --severity HIGH
+  python main.py . --fail-on-severity HIGH
   python main.py --list-patterns
   python main.py . --skip-pattern "Contextual Secret"
   python main.py . --only-pattern "AWS Access Key ID"
@@ -154,7 +155,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--severity",
         choices=[item.value for item in Severity],
         default=None,
-        help="Minimum severity to report (default: LOW, or the config file)",
+        help="Minimum severity to report (default: LOW, or the config file). "
+        "See --fail-on-severity for the CI exit gate.",
+    )
+    parser.add_argument(
+        "--fail-on-severity",
+        choices=[item.value for item in Severity],
+        default=None,
+        help="Minimum severity that makes the process exit 1 (default: same as "
+        "--severity). Lower findings can still be reported.",
     )
     parser.add_argument(
         "--min-confidence",
@@ -668,6 +677,19 @@ def resolve_min_confidence(
     return 0
 
 
+def resolve_fail_on_severity(
+    namespace: argparse.Namespace,
+    settings: FileSettings | None,
+    report_minimum: Severity,
+) -> Severity:
+    """CLI wins, then config, else the report severity floor."""
+    if namespace.fail_on_severity is not None:
+        return Severity(namespace.fail_on_severity)
+    if settings is not None and settings.fail_on_severity is not None:
+        return Severity(settings.fail_on_severity)
+    return report_minimum
+
+
 def resolve_max_file_size_bytes(
     namespace: argparse.Namespace, settings: FileSettings | None = None
 ) -> int | None:
@@ -688,6 +710,7 @@ def render_text(
     findings: list[SecretFinding],
     *,
     color: bool,
+    fail_on: Severity,
 ) -> None:
     title = _paint("Secret Scanner", _BOLD, color)
     print(title)
@@ -698,6 +721,7 @@ def render_text(
     print(f"Files skipped (oversize): {result.files_skipped_oversized}")
     print(f"Lines scanned: {result.lines_scanned:,}")
     print(f"Potential secrets found: {len(findings)}")
+    print(f"Fail-on severity: {fail_on.value}")
     print(f"Placeholders ignored: {result.placeholders_ignored}")
     print(f"Allowlist ignored: {result.allowlist_ignored}")
     print(f"Baseline ignored: {result.baseline_ignored}")
@@ -945,6 +969,7 @@ def run(
     verbose = namespace.verbose or (settings.verbose is True)
     setup_logging(log_file=log_file, verbose=verbose)
     minimum = Severity(namespace.severity or settings.severity or Severity.LOW.value)
+    fail_on = resolve_fail_on_severity(namespace, settings, minimum)
     color = _use_color(namespace.no_color or (settings.no_color is True))
     quiet = namespace.quiet or (settings.quiet is True)
     confidence_floor = resolve_min_confidence(namespace, settings)
@@ -1063,7 +1088,7 @@ def run(
                 quiet=quiet,
             )
         elif not quiet:
-            render_text(result, target, findings, color=color)
+            render_text(result, target, findings, color=color, fail_on=fail_on)
         if namespace.sarif_file:
             sidecar = namespace.sarif_file.strip()
             if not sidecar or sidecar == "-":
@@ -1098,6 +1123,9 @@ def run(
             print(f"Baseline updated: {written.as_posix()}")
         return 0
 
-    if findings:
+    gated = any(meets_minimum(item.severity, fail_on) for item in findings)
+    if findings and not gated and not quiet and format_name == "text":
+        print(f"No finding meets fail-on {fail_on.value}; exiting 0.")
+    if gated:
         return 1
     return 0

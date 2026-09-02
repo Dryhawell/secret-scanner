@@ -26,7 +26,7 @@ def test_version_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as caught:
         parser.parse_args(["--version"])
     assert caught.value.code == 0
-    assert "1.24.0" in capsys.readouterr().out
+    assert "1.25.0" in capsys.readouterr().out
 
 
 def test_staged_and_changed_are_exclusive() -> None:
