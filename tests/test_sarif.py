@@ -103,3 +103,23 @@ def test_cli_infers_sarif_from_output_suffix(tmp_path: Path) -> None:
     assert code == 0
     data = json.loads(report.read_text(encoding="utf-8"))
     assert data["version"] == "2.1.0"
+
+
+def test_cli_sarif_file_sidecar_keeps_text(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    report = tmp_path / "out.sarif"
+    code = run(
+        ["--no-color", "--sarif-file", str(report), str(src)],
+        log_file=tmp_path / "cli.log",
+        reports_dir=tmp_path / "reports",
+    )
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "Files scanned" in captured.out
+    data = json.loads(report.read_text(encoding="utf-8"))
+    assert data["version"] == "2.1.0"
+    assert data["runs"][0]["results"] == []

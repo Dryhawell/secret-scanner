@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.24.0 — 2026-09-02
+
+### Added
+
+- `--sarif-file FILE` writes SARIF in addition to the selected `--format`
+- GitHub Action inputs `sarif` / `sarif-file` (upload is opt-in; needs `security-events: write`)
+
 ## 1.23.0 — 2026-09-02
 
 ### Added

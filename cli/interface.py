@@ -87,6 +87,7 @@ examples:
   python main.py . --skip-pattern "Contextual Secret"
   python main.py . --only-pattern "AWS Access Key ID"
   python main.py . --max-file-size 10
+  python main.py . --sarif-file secret-scanner.sarif
   python main.py . --exclude dist --exclude build
   python main.py . --glob "*.env" --glob "*.py"
   python main.py . --skip-glob "*.min.js"
@@ -233,6 +234,12 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="FILE",
         help="Write JSON, SARIF, or HTML to FILE (use - for stdout). Without --output, "
         "--format json|sarif|html writes reports/scan_YYYY-MM-DD_HHMM.*",
+    )
+    parser.add_argument(
+        "--sarif-file",
+        metavar="FILE",
+        default=None,
+        help="Also write SARIF 2.1.0 to FILE (in addition to --format). Not stdout.",
     )
     parser.add_argument(
         "--verbose",
@@ -1057,6 +1064,20 @@ def run(
             )
         elif not quiet:
             render_text(result, target, findings, color=color)
+        if namespace.sarif_file:
+            sidecar = namespace.sarif_file.strip()
+            if not sidecar or sidecar == "-":
+                print("Error: --sarif-file must be a file path, not stdout", file=sys.stderr)
+                return 2
+            written = write_sarif_report(
+                result,
+                findings,
+                target,
+                output=Path(sidecar),
+                reports_dir=reports_dir or Path("reports"),
+            )
+            if not quiet:
+                print(f"Report written: {written.as_posix()}")
     except OSError as exc:
         get_logger().error("Unable to write output: %s", exc)
         print(f"Error: {exc}", file=sys.stderr)

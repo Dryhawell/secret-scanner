@@ -26,6 +26,14 @@ inputs:
     description: Suppress the text report (exit code still 1 on findings)
     required: false
     default: "false"
+  sarif:
+    description: Write SARIF and upload to GitHub code scanning (needs security-events: write)
+    required: false
+    default: "false"
+  sarif-file:
+    description: Workspace-relative SARIF path (only used when sarif is true)
+    required: false
+    default: "secret-scanner.sarif"
 
 runs:
   using: composite
@@ -43,4 +51,13 @@ runs:
         SECRET_SCANNER_INCLUDE_HIDDEN: ${{ inputs.include-hidden }}
         SECRET_SCANNER_SEVERITY: ${{ inputs.severity }}
         SECRET_SCANNER_QUIET: ${{ inputs.quiet }}
+        SECRET_SCANNER_SARIF: ${{ inputs.sarif }}
+        SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}
       run: python "$SECRET_SCANNER_ROOT/cli/github_action.py"
+
+    - name: Upload SARIF
+      if: ${{ always() && inputs.sarif == 'true' && hashFiles(inputs.sarif-file) != '' }}
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.sarif-file }}
+        category: secret-scanner

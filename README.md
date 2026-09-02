@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.23.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.24.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.23.0
+# Secret Scanner 1.24.0
 ```
 
 ## Why Secret Scanner?
@@ -40,7 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
-- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.23.0`)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.24.0`)
 - `--jobs` worker threads for file scans (default 1)
 - Localhost HTML dashboard (`--dashboard`)
 - Path / finding allowlist (`.secret-scanner-ignore`) and inline `secret-scanner:ignore`
@@ -55,6 +55,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - `--list-patterns`, `--skip-pattern`, and `--only-pattern`
 - `--max-file-size N` (mebibytes; `0` = unlimited)
 - Oversized-file skip count in the scan summary
+- GitHub Action opt-in SARIF upload (`sarif: true`)
 
 ## Detection Engine
 
@@ -174,6 +175,7 @@ python main.py [path] [options]
 | `--no-browser` | Do not open a browser when the dashboard starts |
 | `--format text\|json\|sarif\|html` | Terminal text, JSON, SARIF 2.1.0, or HTML under `reports/` |
 | `--output FILE` / `-o -` | Write JSON, SARIF, or HTML to a file, or stdout |
+| `--sarif-file FILE` | Also write SARIF 2.1.0 to FILE (does not replace `--format`) |
 | `--no-color` | Disable ANSI colors |
 | `--quiet` / `-q` | Suppress the text report (exit code still 1 on findings) |
 | `--verbose` | DEBUG per-file lines in the log file |
@@ -207,6 +209,7 @@ python main.py --list-patterns
 python main.py . --skip-pattern "Contextual Secret"
 python main.py . --only-pattern "AWS Access Key ID"
 python main.py . --max-file-size 10
+python main.py . --sarif-file secret-scanner.sarif
 python main.py . --exclude dist --exclude build
 python main.py . --glob "*.env" --glob "*.py"
 python main.py . --skip-glob "*.min.js"
@@ -449,12 +452,14 @@ and no plaintext secret: a snippet would copy the original line into the
 code scanning API. Messages use the masked value. `partialFingerprints`
 store the SHA-256 finding id, not the secret.
 
-Upload example (does not replace the product-code scan job):
+Upload example (does not replace the product-code scan job). The composite
+action can do this with `sarif: true` (see below). Manual steps:
 
 ```yaml
 - name: Secret scan (SARIF)
-  run: python main.py . --no-color --format sarif --output reports/scan.sarif
+  run: python main.py . --no-color --sarif-file reports/scan.sarif
 - name: Upload SARIF
+  if: always()
   uses: github/codeql-action/upload-sarif@v3
   with:
     sarif_file: reports/scan.sarif
@@ -538,16 +543,40 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.23.0
+      - uses: Dryhawell/secret-scanner@v1.24.0
         with:
           include-hidden: true
 ```
 
+Code Scanning upload is **opt-in**. The composite action cannot grant
+permissions; the caller must. Fork pull requests often cannot upload.
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: Dryhawell/secret-scanner@v1.24.0
+        with:
+          include-hidden: true
+          sarif: true
+```
+
 Inputs: `path` (default `.`), `include-hidden`, `severity`, `python-version`,
-`quiet` (default false; keep false so masked findings stay in the job log).
-The action always passes `--no-color` (Actions logs). It does not run
-`--dashboard`, `--update-baseline`, `--stdin`, or Git scan flags. Put extra
-policy in `.secret-scanner.json` / `.secret-scanner-ignore` in *your* repo.
+`quiet` (default false; keep false so masked findings stay in the job log),
+`sarif` (default false), `sarif-file` (default `secret-scanner.sarif`,
+workspace-relative only). The action always passes `--no-color` (Actions logs).
+It does not run `--dashboard`, `--update-baseline`, `--stdin`, or Git scan
+flags. Put extra policy in `.secret-scanner.json` / `.secret-scanner-ignore`
+in *your* repo. `sarif: true` writes a sidecar and still prints the text
+report. Upload uses `if: always()` so a findings exit (1) still uploads;
+a scanner error (2) skips upload when the file is missing.
 
 Without the action, if this tree is already checked out:
 
@@ -578,7 +607,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, `--max-file-size`, oversized skip counts, parallel file scans, the localhost dashboard, the hook
+and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, `--max-file-size`, oversized skip counts, GitHub Action SARIF upload, parallel file scans, the localhost dashboard, the hook
 installer, project config files, custom patterns, SARIF and HTML reports, and
 the CI workflow file. All credentials in tests are fakes.
 
@@ -640,14 +669,16 @@ the CI workflow file. All credentials in tests are fakes.
   with `--skip-pattern` until nothing remains, the run exits 2.
 - The GitHub composite action scans the **caller workspace** after checkout.
   Pin a release tag (or commit SHA). `uses: ./` is only for this repository.
-  It does not upload SARIF and does not grant extra `permissions`.
+  `sarif: true` uploads Code Scanning; the caller must grant
+  `security-events: write`. The action itself does not set `permissions`.
+  Fork PRs often cannot upload. SARIF still has no source snippets.
 
 ## Architecture
 
 ```text
 main.py                 entry point (exit code from cli)
 cli/interface.py        argparse, text/JSON output, Git flags, --stdin, --quiet, --min-confidence, --list-patterns, --only-pattern, --max-file-size
-cli/github_action.py    composite-action argv (env → CLI, --no-color)
+cli/github_action.py    composite-action argv (env → CLI, --no-color, optional SARIF)
 cli/dashboard.py        localhost HTML dashboard (127.0.0.1)
 scanner/
   file_handler.py       discovery, excludes, globs, binary/size caps, skip counts

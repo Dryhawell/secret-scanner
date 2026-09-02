@@ -22,6 +22,11 @@ def test_action_yml_is_composite_and_masks_in_logs() -> None:
     assert 'run: python "$SECRET_SCANNER_ROOT/cli/github_action.py"' in text
     assert "SECRET_SCANNER_PATH: ${{ inputs.path }}" in text
     assert "SECRET_SCANNER_QUIET: ${{ inputs.quiet }}" in text
+    assert "SECRET_SCANNER_SARIF: ${{ inputs.sarif }}" in text
+    assert "SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}" in text
+    assert "github/codeql-action/upload-sarif@v3" in text
+    assert "always()" in text
+    assert "permissions:" not in text
     assert "--update-baseline" not in text
     assert "--dashboard" not in text
     assert "--install-hook" not in text
@@ -40,6 +45,8 @@ def test_action_run_line_does_not_interpolate_path_into_shell() -> None:
     assert "${{ inputs.severity }}" not in run_line
     assert "${{ inputs.include-hidden }}" not in run_line
     assert "${{ inputs.quiet }}" not in run_line
+    assert "${{ inputs.sarif }}" not in run_line
+    assert "${{ inputs.sarif-file }}" not in run_line
 
 
 def test_product_ci_uses_local_action() -> None:
@@ -75,6 +82,55 @@ def test_argv_quiet_is_opt_in() -> None:
     argv = argv_from_env({"SECRET_SCANNER_PATH": ".", "SECRET_SCANNER_QUIET": "true"})
     assert "--quiet" in argv
     assert "--quiet" not in argv_from_env({"SECRET_SCANNER_PATH": "."})
+
+
+def test_argv_sarif_is_opt_in() -> None:
+    argv = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_SARIF": "true",
+        }
+    )
+    assert argv[argv.index("--sarif-file") + 1] == "secret-scanner.sarif"
+    without = argv_from_env({"SECRET_SCANNER_PATH": "."})
+    assert "--sarif-file" not in without
+
+
+def test_argv_sarif_custom_file() -> None:
+    argv = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_SARIF": "true",
+            "SECRET_SCANNER_SARIF_FILE": "reports/scan.sarif",
+        }
+    )
+    assert argv[argv.index("--sarif-file") + 1] == "reports/scan.sarif"
+
+
+def test_argv_rejects_unsafe_sarif_file() -> None:
+    with pytest.raises(ActionConfigError):
+        argv_from_env(
+            {
+                "SECRET_SCANNER_SARIF": "true",
+                "SECRET_SCANNER_SARIF_FILE": "../out.sarif",
+            }
+        )
+    with pytest.raises(ActionConfigError):
+        argv_from_env(
+            {
+                "SECRET_SCANNER_SARIF": "true",
+                "SECRET_SCANNER_SARIF_FILE": "/tmp/out.sarif",
+            }
+        )
+    with pytest.raises(ActionConfigError):
+        argv_from_env(
+            {
+                "SECRET_SCANNER_SARIF": "true",
+                "SECRET_SCANNER_SARIF_FILE": "out.json",
+            }
+        )
+    with pytest.raises(ActionConfigError):
+        argv_from_env({"SECRET_SCANNER_SARIF": "maybe"})
 
 
 def test_argv_rejects_unknown_quiet() -> None:

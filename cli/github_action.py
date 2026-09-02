@@ -21,10 +21,38 @@ from cli.interface import run
 _SEVERITIES = frozenset({"LOW", "MEDIUM", "HIGH", "CRITICAL"})
 _HIDDEN_TRUE = frozenset({"true", "1", "yes"})
 _HIDDEN_FALSE = frozenset({"false", "0", "no", ""})
+_DEFAULT_SARIF_FILE = "secret-scanner.sarif"
+_MAX_SARIF_PATH = 256
 
 
 class ActionConfigError(ValueError):
     """Invalid composite-action input (exit 2)."""
+
+
+def _flag_from_env(env: Mapping[str, str], key: str, *, label: str) -> bool:
+    raw = env.get(key, "false").strip().casefold()
+    if raw not in _HIDDEN_TRUE | _HIDDEN_FALSE:
+        raise ActionConfigError(f"{label} must be true or false")
+    return raw in _HIDDEN_TRUE
+
+
+def relative_sarif_path(raw: str) -> str:
+    """Return a workspace-relative ``*.sarif`` path, or raise ActionConfigError."""
+    text = raw.strip()
+    if not text or "\n" in raw or "\r" in raw:
+        raise ActionConfigError("sarif-file must be a single non-empty line")
+    if len(text) > _MAX_SARIF_PATH:
+        raise ActionConfigError("sarif-file path is too long")
+    if text.startswith("-"):
+        raise ActionConfigError("sarif-file must not look like a CLI flag")
+    path = Path(text)
+    if path.is_absolute() or bool(path.anchor):
+        raise ActionConfigError("sarif-file must be a relative path")
+    if any(part == ".." for part in path.parts):
+        raise ActionConfigError("sarif-file must not contain ..")
+    if path.suffix.casefold() != ".sarif":
+        raise ActionConfigError("sarif-file must end with .sarif")
+    return path.as_posix()
 
 
 def argv_from_env(env: Mapping[str, str]) -> list[str]:
@@ -36,22 +64,22 @@ def argv_from_env(env: Mapping[str, str]) -> list[str]:
     if target.startswith("-"):
         raise ActionConfigError("path must not look like a CLI flag")
 
-    hidden_raw = env.get("SECRET_SCANNER_INCLUDE_HIDDEN", "false").strip().casefold()
-    if hidden_raw not in _HIDDEN_TRUE | _HIDDEN_FALSE:
-        raise ActionConfigError("include-hidden must be true or false")
+    hidden = _flag_from_env(env, "SECRET_SCANNER_INCLUDE_HIDDEN", label="include-hidden")
 
     severity = (env.get("SECRET_SCANNER_SEVERITY") or "LOW").strip().upper()
     if severity not in _SEVERITIES:
         raise ActionConfigError("severity must be LOW, MEDIUM, HIGH, or CRITICAL")
 
     argv = ["--no-color", "--severity", severity, target]
-    if hidden_raw in _HIDDEN_TRUE:
+    if hidden:
         argv.append("--include-hidden")
-    quiet_raw = env.get("SECRET_SCANNER_QUIET", "false").strip().casefold()
-    if quiet_raw not in _HIDDEN_TRUE | _HIDDEN_FALSE:
-        raise ActionConfigError("quiet must be true or false")
-    if quiet_raw in _HIDDEN_TRUE:
+    if _flag_from_env(env, "SECRET_SCANNER_QUIET", label="quiet"):
         argv.append("--quiet")
+    if _flag_from_env(env, "SECRET_SCANNER_SARIF", label="sarif"):
+        sarif_file = relative_sarif_path(
+            env.get("SECRET_SCANNER_SARIF_FILE", _DEFAULT_SARIF_FILE)
+        )
+        argv.extend(["--sarif-file", sarif_file])
     return argv
 
 
