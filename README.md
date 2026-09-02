@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.25.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.26.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.25.0
+# Secret Scanner 1.26.0
 ```
 
 ## Why Secret Scanner?
@@ -40,7 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
-- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.25.0`)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.26.0`)
 - `--jobs` worker threads for file scans (default 1)
 - Localhost HTML dashboard (`--dashboard`)
 - Path / finding allowlist (`.secret-scanner-ignore`) and inline `secret-scanner:ignore`
@@ -548,9 +548,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.25.0
+      - uses: Dryhawell/secret-scanner@v1.26.0
         with:
           include-hidden: true
+          fail-on-severity: HIGH
 ```
 
 Code Scanning upload is **opt-in**. The composite action cannot grant
@@ -567,13 +568,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.25.0
+      - uses: Dryhawell/secret-scanner@v1.26.0
         with:
           include-hidden: true
           sarif: true
 ```
 
-Inputs: `path` (default `.`), `include-hidden`, `severity`, `python-version`,
+Inputs: `path` (default `.`), `include-hidden`, `severity`,
+`fail-on-severity` (empty = same as `severity`), `python-version`,
 `quiet` (default false; keep false so masked findings stay in the job log),
 `sarif` (default false), `sarif-file` (default `secret-scanner.sarif`,
 workspace-relative only). The action always passes `--no-color` (Actions logs).
@@ -686,7 +688,7 @@ the CI workflow file. All credentials in tests are fakes.
 ```text
 main.py                 entry point (exit code from cli)
 cli/interface.py        argparse, text/JSON output, Git flags, --stdin, --quiet, --min-confidence, --fail-on-severity, --list-patterns, --only-pattern, --max-file-size
-cli/github_action.py    composite-action argv (env → CLI, --no-color, optional SARIF)
+cli/github_action.py    composite-action argv (env → CLI, --no-color, optional SARIF, fail-on-severity)
 cli/dashboard.py        localhost HTML dashboard (127.0.0.1)
 scanner/
   file_handler.py       discovery, excludes, globs, binary/size caps, skip counts

@@ -18,6 +18,10 @@ inputs:
     description: Minimum severity to report (LOW, MEDIUM, HIGH, or CRITICAL)
     required: false
     default: "LOW"
+  fail-on-severity:
+    description: Minimum severity that fails the job (empty = same as severity)
+    required: false
+    default: ""
   python-version:
     description: Python version for actions/setup-python (3.11 or newer)
     required: false
@@ -50,6 +54,7 @@ runs:
         SECRET_SCANNER_PATH: ${{ inputs.path }}
         SECRET_SCANNER_INCLUDE_HIDDEN: ${{ inputs.include-hidden }}
         SECRET_SCANNER_SEVERITY: ${{ inputs.severity }}
+        SECRET_SCANNER_FAIL_ON_SEVERITY: ${{ inputs.fail-on-severity }}
         SECRET_SCANNER_QUIET: ${{ inputs.quiet }}
         SECRET_SCANNER_SARIF: ${{ inputs.sarif }}
         SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}

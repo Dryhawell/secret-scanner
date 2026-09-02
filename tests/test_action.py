@@ -21,6 +21,8 @@ def test_action_yml_is_composite_and_masks_in_logs() -> None:
     assert "github.action_path" in text
     assert 'run: python "$SECRET_SCANNER_ROOT/cli/github_action.py"' in text
     assert "SECRET_SCANNER_PATH: ${{ inputs.path }}" in text
+    assert "SECRET_SCANNER_SEVERITY: ${{ inputs.severity }}" in text
+    assert "SECRET_SCANNER_FAIL_ON_SEVERITY: ${{ inputs.fail-on-severity }}" in text
     assert "SECRET_SCANNER_QUIET: ${{ inputs.quiet }}" in text
     assert "SECRET_SCANNER_SARIF: ${{ inputs.sarif }}" in text
     assert "SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}" in text
@@ -43,6 +45,7 @@ def test_action_run_line_does_not_interpolate_path_into_shell() -> None:
     )
     assert "${{ inputs.path }}" not in run_line
     assert "${{ inputs.severity }}" not in run_line
+    assert "${{ inputs.fail-on-severity }}" not in run_line
     assert "${{ inputs.include-hidden }}" not in run_line
     assert "${{ inputs.quiet }}" not in run_line
     assert "${{ inputs.sarif }}" not in run_line
@@ -152,6 +155,46 @@ def test_argv_rejects_unknown_severity_and_hidden() -> None:
         argv_from_env({"SECRET_SCANNER_SEVERITY": "EXTREME"})
     with pytest.raises(ActionConfigError):
         argv_from_env({"SECRET_SCANNER_INCLUDE_HIDDEN": "maybe"})
+
+
+def test_argv_fail_on_severity_is_opt_in() -> None:
+    argv = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_FAIL_ON_SEVERITY": "HIGH",
+        }
+    )
+    assert argv[argv.index("--fail-on-severity") + 1] == "HIGH"
+    without = argv_from_env({"SECRET_SCANNER_PATH": "."})
+    assert "--fail-on-severity" not in without
+    empty = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_FAIL_ON_SEVERITY": "",
+        }
+    )
+    assert "--fail-on-severity" not in empty
+
+
+def test_argv_rejects_unknown_fail_on_severity() -> None:
+    with pytest.raises(ActionConfigError, match="fail-on-severity"):
+        argv_from_env({"SECRET_SCANNER_FAIL_ON_SEVERITY": "EXTREME"})
+
+
+def test_action_fail_on_high_exits_zero_on_contextual(tmp_path: Path) -> None:
+    (tmp_path / "auth.py").write_text(
+        'token = "LocalDevTokenValue1"\n',
+        encoding="utf-8",
+    )
+    code = main(
+        {
+            "SECRET_SCANNER_PATH": str(tmp_path),
+            "SECRET_SCANNER_FAIL_ON_SEVERITY": "HIGH",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert code == 0
 
 
 def test_action_clean_tree_exits_zero(tmp_path: Path) -> None:

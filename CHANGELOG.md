@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.26.0 — 2026-09-02
+
+### Added
+
+- GitHub Action input `fail-on-severity` (empty = same as `severity`; via env, not the shell)
+
 ## 1.25.0 — 2026-09-02
 
 ### Added

@@ -71,6 +71,13 @@ def argv_from_env(env: Mapping[str, str]) -> list[str]:
         raise ActionConfigError("severity must be LOW, MEDIUM, HIGH, or CRITICAL")
 
     argv = ["--no-color", "--severity", severity, target]
+    fail_on = (env.get("SECRET_SCANNER_FAIL_ON_SEVERITY") or "").strip().upper()
+    if fail_on:
+        if fail_on not in _SEVERITIES:
+            raise ActionConfigError(
+                "fail-on-severity must be LOW, MEDIUM, HIGH, or CRITICAL"
+            )
+        argv.extend(["--fail-on-severity", fail_on])
     if hidden:
         argv.append("--include-hidden")
     if _flag_from_env(env, "SECRET_SCANNER_QUIET", label="quiet"):
