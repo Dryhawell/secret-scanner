@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.28.0 — 2026-09-02
+
+### Added
+
+- GitHub Action input `max-file-size` (empty = CLI default 5 MiB; `0` = unlimited; via env, not the shell)
+
 ## 1.27.0 — 2026-09-02
 
 ### Added

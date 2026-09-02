@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from cli.github_action import ActionConfigError, argv_from_env, main
+from scanner.file_handler import MIB
 
 ROOT = Path(__file__).resolve().parent.parent
 ACTION = ROOT / "action.yml"
@@ -23,6 +24,7 @@ def test_action_yml_is_composite_and_masks_in_logs() -> None:
     assert "SECRET_SCANNER_PATH: ${{ inputs.path }}" in text
     assert "SECRET_SCANNER_SEVERITY: ${{ inputs.severity }}" in text
     assert "SECRET_SCANNER_FAIL_ON_SEVERITY: ${{ inputs.fail-on-severity }}" in text
+    assert "SECRET_SCANNER_MAX_FILE_SIZE: ${{ inputs.max-file-size }}" in text
     assert "SECRET_SCANNER_QUIET: ${{ inputs.quiet }}" in text
     assert "SECRET_SCANNER_SARIF: ${{ inputs.sarif }}" in text
     assert "SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}" in text
@@ -46,6 +48,7 @@ def test_action_run_line_does_not_interpolate_path_into_shell() -> None:
     assert "${{ inputs.path }}" not in run_line
     assert "${{ inputs.severity }}" not in run_line
     assert "${{ inputs.fail-on-severity }}" not in run_line
+    assert "${{ inputs.max-file-size }}" not in run_line
     assert "${{ inputs.include-hidden }}" not in run_line
     assert "${{ inputs.quiet }}" not in run_line
     assert "${{ inputs.sarif }}" not in run_line
@@ -179,6 +182,78 @@ def test_argv_fail_on_severity_is_opt_in() -> None:
 def test_argv_rejects_unknown_fail_on_severity() -> None:
     with pytest.raises(ActionConfigError, match="fail-on-severity"):
         argv_from_env({"SECRET_SCANNER_FAIL_ON_SEVERITY": "EXTREME"})
+
+
+def test_argv_max_file_size_is_opt_in() -> None:
+    argv = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_MAX_FILE_SIZE": "10",
+        }
+    )
+    assert argv[argv.index("--max-file-size") + 1] == "10"
+    without = argv_from_env({"SECRET_SCANNER_PATH": "."})
+    assert "--max-file-size" not in without
+    empty = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_MAX_FILE_SIZE": "",
+        }
+    )
+    assert "--max-file-size" not in empty
+    unlimited = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_MAX_FILE_SIZE": "0",
+        }
+    )
+    assert unlimited[unlimited.index("--max-file-size") + 1] == "0"
+
+
+def test_argv_rejects_invalid_max_file_size() -> None:
+    with pytest.raises(ActionConfigError, match="max-file-size"):
+        argv_from_env({"SECRET_SCANNER_MAX_FILE_SIZE": "abc"})
+    with pytest.raises(ActionConfigError, match="max-file-size"):
+        argv_from_env({"SECRET_SCANNER_MAX_FILE_SIZE": "-1"})
+    with pytest.raises(ActionConfigError, match="max-file-size"):
+        argv_from_env({"SECRET_SCANNER_MAX_FILE_SIZE": "1025"})
+    with pytest.raises(ActionConfigError, match="max-file-size"):
+        argv_from_env({"SECRET_SCANNER_MAX_FILE_SIZE": "10\n2"})
+    assert main({"SECRET_SCANNER_MAX_FILE_SIZE": "abc"}) == 2
+
+
+def test_action_max_file_size_skips_oversized(tmp_path: Path) -> None:
+    src = tmp_path / "src"
+    src.mkdir()
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    payload = f"AWS_ACCESS_KEY_ID = '{aws}'\n" + ("x" * (2 * MIB))
+    (src / "dump.py").write_text(payload, encoding="utf-8")
+    code = main(
+        {
+            "SECRET_SCANNER_PATH": str(src),
+            "SECRET_SCANNER_MAX_FILE_SIZE": "1",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert code == 0
+
+
+def test_action_max_file_size_zero_scans_large_file(tmp_path: Path) -> None:
+    src = tmp_path / "src"
+    src.mkdir()
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    payload = f"AWS_ACCESS_KEY_ID = '{aws}'\n" + ("x" * (2 * MIB))
+    (src / "dump.py").write_text(payload, encoding="utf-8")
+    code = main(
+        {
+            "SECRET_SCANNER_PATH": str(src),
+            "SECRET_SCANNER_MAX_FILE_SIZE": "0",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert code == 1
 
 
 def test_action_fail_on_high_exits_zero_on_contextual(tmp_path: Path) -> None:
