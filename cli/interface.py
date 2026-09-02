@@ -31,9 +31,12 @@ from scanner.config_file import (
 from scanner.entropy import ENTROPY_GATED_PATTERNS, FORMAT_LOCKED_PATTERNS
 from scanner.file_handler import (
     DEFAULT_MAX_FILE_SIZE,
+    MAX_FILE_SIZE_MIB,
     MAX_JOBS,
+    MIB,
     GlobError,
     ScanConfig,
+    bytes_for_mib,
     normalize_glob,
     resolve_jobs,
 )
@@ -83,6 +86,7 @@ examples:
   python main.py --list-patterns
   python main.py . --skip-pattern "Contextual Secret"
   python main.py . --only-pattern "AWS Access Key ID"
+  python main.py . --max-file-size 10
   python main.py . --exclude dist --exclude build
   python main.py . --glob "*.env" --glob "*.py"
   python main.py . --skip-glob "*.min.js"
@@ -274,6 +278,14 @@ def build_parser() -> argparse.ArgumentParser:
         "Does not apply to --history or --stdin.",
     )
     parser.add_argument(
+        "--max-file-size",
+        type=_parse_max_file_size,
+        default=None,
+        metavar="N",
+        help="Skip files larger than N mebibytes (default: 5, 0 = unlimited, "
+        f"max {MAX_FILE_SIZE_MIB}). Also applies to --stdin.",
+    )
+    parser.add_argument(
         "--stdin",
         action="store_true",
         help="Scan text from stdin (pipe). Does not write the buffer to disk.",
@@ -365,6 +377,19 @@ def _parse_jobs(raw: str) -> int:
     return value
 
 
+def _parse_max_file_size(raw: str) -> int:
+    """Argparse type for --max-file-size (mebibytes). 0 means unlimited."""
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("max-file-size must be an integer") from exc
+    if value < 0 or value > MAX_FILE_SIZE_MIB:
+        raise argparse.ArgumentTypeError(
+            f"max-file-size must be between 0 and {MAX_FILE_SIZE_MIB} (0 = unlimited)"
+        )
+    return value
+
+
 def _parse_port(raw: str) -> int:
     try:
         value = int(raw)
@@ -424,6 +449,7 @@ def build_scan_config(
     if namespace.jobs is not None:
         requested = namespace.jobs
     config.jobs = resolve_jobs(requested)
+    config.max_file_size_bytes = resolve_max_file_size_bytes(namespace, settings)
     return config
 
 
@@ -633,6 +659,20 @@ def resolve_min_confidence(
     if settings is not None and settings.min_confidence is not None:
         return settings.min_confidence
     return 0
+
+
+def resolve_max_file_size_bytes(
+    namespace: argparse.Namespace, settings: FileSettings | None = None
+) -> int | None:
+    """CLI wins, then config, else 5 MiB. ``0`` means unlimited."""
+    mib: int | None = None
+    if namespace.max_file_size is not None:
+        mib = namespace.max_file_size
+    elif settings is not None:
+        mib = settings.max_file_size
+    if mib is None:
+        return DEFAULT_MAX_FILE_SIZE
+    return bytes_for_mib(mib)
 
 
 def render_text(
@@ -925,9 +965,12 @@ def run(
                 get_logger().error("Unable to read stdin: %s", exc)
                 print(f"Error: {exc}", file=sys.stderr)
                 return 2
-            if len(text.encode("utf-8")) > DEFAULT_MAX_FILE_SIZE:
-                get_logger().error("stdin exceeds the 5 MiB size limit")
-                print("Error: stdin exceeds the 5 MiB size limit", file=sys.stderr)
+            limit = scanner.config.max_file_size_bytes
+            if limit is not None and len(text.encode("utf-8")) > limit:
+                mib = limit // MIB if limit >= MIB else 0
+                label = f"{mib} MiB" if mib else f"{limit} bytes"
+                get_logger().error("stdin exceeds the %s size limit", label)
+                print(f"Error: stdin exceeds the {label} size limit", file=sys.stderr)
                 return 2
             result = scanner.scan_text(
                 text, virtual_path=stdin_label, target=target

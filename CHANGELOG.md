@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.22.0 — 2026-09-02
+
+### Added
+
+- `--max-file-size N` skips files (and stdin) larger than N mebibytes
+- Config key `max_file_size` (0 = unlimited, default 5, max 1024); CLI overrides
+
 ## 1.21.0 — 2026-09-01
 
 ### Added

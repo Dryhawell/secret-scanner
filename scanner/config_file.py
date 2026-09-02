@@ -13,7 +13,14 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from scanner.file_handler import MAX_GLOBS, MAX_GLOB_LENGTH, MAX_JOBS, GlobError, normalize_glob
+from scanner.file_handler import (
+    MAX_FILE_SIZE_MIB,
+    MAX_GLOBS,
+    MAX_GLOB_LENGTH,
+    MAX_JOBS,
+    GlobError,
+    normalize_glob,
+)
 from scanner.ignore import default_sidecar
 from scanner.models import SecretPattern, Severity
 from utils.logger import get_logger
@@ -47,6 +54,7 @@ _ALLOWED_KEYS = frozenset(
         "skip_patterns",
         "only_patterns",
         "jobs",
+        "max_file_size",
     }
 )
 _PATTERN_KEYS = frozenset(
@@ -92,6 +100,7 @@ class FileSettings:
     skip_patterns: tuple[str, ...] = ()
     only_patterns: tuple[str, ...] = ()
     jobs: int | None = None
+    max_file_size: int | None = None
 
 
 def default_config_file(target: Path) -> Path | None:
@@ -343,6 +352,7 @@ def settings_from_mapping(data: dict[str, object], *, base: Path) -> FileSetting
         skip_patterns=tuple(_named_pattern_list(data, "skip_patterns")),
         only_patterns=tuple(_named_pattern_list(data, "only_patterns")),
         jobs=_optional_jobs(data, "jobs"),
+        max_file_size=_optional_max_file_size(data, "max_file_size"),
     )
 
 
@@ -533,6 +543,24 @@ def _optional_jobs(data: dict[str, object], key: str) -> int | None:
     if value < 0 or value > MAX_JOBS:
         raise ConfigError(
             f"Config {key} must be between 0 and {MAX_JOBS} (0 = auto)."
+        )
+    return value
+
+
+def _optional_max_file_size(data: dict[str, object], key: str) -> int | None:
+    if key not in data or data[key] is None:
+        return None
+    value = data[key]
+    if isinstance(value, str) and value.isdigit():
+        value = int(value)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ConfigError(
+            f"Config {key} must be an integer 0-{MAX_FILE_SIZE_MIB}."
+        )
+    if value < 0 or value > MAX_FILE_SIZE_MIB:
+        raise ConfigError(
+            f"Config {key} must be between 0 and {MAX_FILE_SIZE_MIB} "
+            "(0 = unlimited)."
         )
     return value
 

@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.21.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.22.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.21.0
+# Secret Scanner 1.22.0
 ```
 
 ## Why Secret Scanner?
@@ -40,7 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
-- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.21.0`)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.22.0`)
 - `--jobs` worker threads for file scans (default 1)
 - Localhost HTML dashboard (`--dashboard`)
 - Path / finding allowlist (`.secret-scanner-ignore`) and inline `secret-scanner:ignore`
@@ -53,13 +53,14 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - `--quiet` / `-q` (text report off; exit code unchanged)
 - `--min-confidence` report filter (not a detector change)
 - `--list-patterns`, `--skip-pattern`, and `--only-pattern`
+- `--max-file-size N` (mebibytes; `0` = unlimited)
 
 ## Detection Engine
 
 The pipeline is **pattern + context + placeholder filter + entropy (gated)**.
 
 1. **File discovery** — skip `.git`, `.venv`, `node_modules`, known binary
-   extensions, files over 5 MiB, and lines longer than 100 000 characters.
+   extensions, files over `--max-file-size` (default 5 MiB), and lines longer than 100 000 characters.
    Hidden *directories* (`.github`) are skipped unless `--include-hidden`.
    Hidden *files* such as `.env` are still scanned.
 2. **Format patterns** — public prefixes and shapes (`AKIA…`, `ghp_`, `glpat-`,
@@ -165,6 +166,7 @@ python main.py [path] [options]
 | `--history-depth N` | How many recent commits `--history` reads (default: 200, max 5000) |
 | `--since REF` | Files changed since REF (`git diff REF...HEAD`, not untracked) |
 | `--jobs N` / `-j N` | Worker threads for file scans (default: 1, `0` = CPU count, max 32) |
+| `--max-file-size N` | Skip files (and stdin) larger than N MiB (default 5, `0` = unlimited, max 1024) |
 | `--stdin` | Scan text from stdin (pipe). Does not write the buffer to disk |
 | `--dashboard` | Localhost HTML dashboard (`127.0.0.1` only) |
 | `--port N` | Dashboard port (default: 8765) |
@@ -203,6 +205,7 @@ python main.py . --min-confidence 80
 python main.py --list-patterns
 python main.py . --skip-pattern "Contextual Secret"
 python main.py . --only-pattern "AWS Access Key ID"
+python main.py . --max-file-size 10
 python main.py . --exclude dist --exclude build
 python main.py . --glob "*.env" --glob "*.py"
 python main.py . --skip-glob "*.min.js"
@@ -293,7 +296,7 @@ Commit a `.secret-scanner.json` (preferred) or `.secret-scanner.yml` next
 to the scan root. `--config FILE` must exist when given (exit `2` if missing).
 CLI flags override the file. Relative `ignore_file` / `baseline` paths are
 resolved from the config file's directory. `jobs` is a worker-thread count
-(`0` = CPU count).
+(`0` = CPU count). `max_file_size` is a mebibyte cap (`0` = unlimited).
 
 JSON:
 
@@ -313,6 +316,7 @@ JSON:
   "ignore_file": ".secret-scanner-ignore",
   "baseline": ".secret-scanner-baseline.json",
   "jobs": 4,
+  "max_file_size": 5,
   "patterns": [
     {
       "name": "Internal Token",
@@ -532,7 +536,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.21.0
+      - uses: Dryhawell/secret-scanner@v1.22.0
         with:
           include-hidden: true
 ```
@@ -572,7 +576,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, parallel file scans, the localhost dashboard, the hook
+and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, `--max-file-size`, parallel file scans, the localhost dashboard, the hook
 installer, project config files, custom patterns, SARIF and HTML reports, and
 the CI workflow file. All credentials in tests are fakes.
 
@@ -589,8 +593,10 @@ the CI workflow file. All credentials in tests are fakes.
   response, not a scanner feature.
 - Merge commits often have an empty default patch; a blob introduced only in
   a merge may be missed.
-- Files larger than 5 MiB and skipped binaries are not scanned (false
-  negatives by design, for performance).
+- Files larger than `--max-file-size` (default 5 MiB) and skipped binaries
+  are not scanned (false negatives by design, for performance). There is
+  no finding for a skipped file; `--verbose` logs the skip. `0` removes
+  the cap and can freeze a regex on a huge dump.
 - `--glob` / `--skip-glob` use `fnmatch`, not gitignore. A name pattern
   (`*.py`) matches the file name in any folder. A pattern with `/` is
   relative to the scan root; `*` there can match across directories.
@@ -615,7 +621,7 @@ the CI workflow file. All credentials in tests are fakes.
   help. Default is 1 (same as a sequential scan). `--history` and `--stdin` stay
   single-threaded.
 - `--stdin` scans one in-memory buffer, not a repository walk. A TTY is
-  refused (exit 2). The same 5 MiB cap as files applies.
+  refused (exit 2). The same `--max-file-size` cap as files applies.
 - Detection is never 100% accurate.
 - `--dashboard` is a local helper, not a multi-user app. It does not scan
   Git history. Binding is loopback-only; do not publish the port.
@@ -637,7 +643,7 @@ the CI workflow file. All credentials in tests are fakes.
 
 ```text
 main.py                 entry point (exit code from cli)
-cli/interface.py        argparse, text/JSON output, Git flags, --stdin, --quiet, --min-confidence, --list-patterns, --only-pattern
+cli/interface.py        argparse, text/JSON output, Git flags, --stdin, --quiet, --min-confidence, --list-patterns, --only-pattern, --max-file-size
 cli/github_action.py    composite-action argv (env → CLI, --no-color)
 cli/dashboard.py        localhost HTML dashboard (127.0.0.1)
 scanner/

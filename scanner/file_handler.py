@@ -67,7 +67,11 @@ BINARY_SNIFF_BYTES = 8192
 
 # Skip files larger than this. A 500 MB .log or misnamed dump would freeze
 # line-by-line regex. Source trees rarely need more than a few megabytes.
-DEFAULT_MAX_FILE_SIZE = 5 * 1024 * 1024
+# CLI/config use mebibytes; 0 means unlimited (None on ScanConfig).
+MIB = 1024 * 1024
+DEFAULT_MAX_FILE_SIZE_MIB = 5
+DEFAULT_MAX_FILE_SIZE = DEFAULT_MAX_FILE_SIZE_MIB * MIB
+MAX_FILE_SIZE_MIB = 1024
 
 # Thread pool size for file scans. 0 on the CLI means "use CPU count".
 MAX_JOBS = 32
@@ -244,6 +248,13 @@ def is_oversized_file(path: Path, config: ScanConfig) -> bool:
     except OSError:
         return True
     return size > limit
+
+
+def bytes_for_mib(mib: int) -> int | None:
+    """Convert a mebibyte count to a byte limit. ``0`` means unlimited."""
+    if mib == 0:
+        return None
+    return mib * MIB
 
 
 def should_scan_file(
