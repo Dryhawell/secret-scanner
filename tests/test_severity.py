@@ -42,6 +42,7 @@ def test_cloud_and_private_key_are_critical() -> None:
     assert severity_for("AWS Access Key ID") is Severity.CRITICAL
     assert severity_for("Azure Storage Account Key") is Severity.CRITICAL
     assert severity_for("Private Key") is Severity.CRITICAL
+    assert severity_for("Age Identity Key") is Severity.CRITICAL
 
 
 def test_tokens_and_api_keys_are_high() -> None:

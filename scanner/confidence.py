@@ -26,6 +26,7 @@ MAX_CONFIDENCE = 99
 # How strongly the *format* implies a real secret. Not the same as severity.
 PATTERN_BASE: dict[str, int] = {
     "Private Key": 92,
+    "Age Identity Key": 92,
     "AWS Access Key ID": 90,
     "Azure Storage Account Key": 90,
     "GitHub Token": 88,
@@ -47,6 +48,8 @@ PATTERN_BASE: dict[str, int] = {
     "Slack Webhook": 86,
     "DigitalOcean Token": 84,
     "Stripe Webhook Secret": 84,
+    "PlanetScale Token": 84,
+    "Postman API Key": 84,
     "Database Connection String": 80,
     "JWT": 76,
     "Generic API Key": 68,

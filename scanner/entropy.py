@@ -46,6 +46,9 @@ FORMAT_LOCKED_PATTERNS: frozenset[str] = frozenset(
         "Slack Webhook",
         "DigitalOcean Token",
         "Stripe Webhook Secret",
+        "Age Identity Key",
+        "PlanetScale Token",
+        "Postman API Key",
     }
 )
 

@@ -33,6 +33,7 @@ PATTERN_SEVERITY: dict[str, Severity] = {
     "AWS Access Key ID": Severity.CRITICAL,
     "Azure Storage Account Key": Severity.CRITICAL,
     "Private Key": Severity.CRITICAL,
+    "Age Identity Key": Severity.CRITICAL,
     # HIGH: tokens and keys that grant API or data access.
     "GitHub Token": Severity.HIGH,
     "GitHub Fine-Grained Token": Severity.HIGH,
@@ -56,6 +57,8 @@ PATTERN_SEVERITY: dict[str, Severity] = {
     "Slack Webhook": Severity.HIGH,
     "DigitalOcean Token": Severity.HIGH,
     "Stripe Webhook Secret": Severity.HIGH,
+    "PlanetScale Token": Severity.HIGH,
+    "Postman API Key": Severity.HIGH,
     # MEDIUM: likely credentials, but often placeholders or local secrets.
     "Generic Password": Severity.MEDIUM,
     # MEDIUM: variable name is sensitive, value has no known vendor format.

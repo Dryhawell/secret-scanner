@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.32.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.33.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.32.0
+# Secret Scanner 1.33.0
 ```
 
 ## Why Secret Scanner?
@@ -40,7 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
-- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.32.0`)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.33.0`)
 - `--jobs` worker threads for file scans (default 1)
 - Localhost HTML dashboard (`--dashboard`)
 - Path / finding allowlist (`.secret-scanner-ignore`) and inline `secret-scanner:ignore`
@@ -71,9 +71,9 @@ The pipeline is **pattern + context + placeholder filter + entropy (gated)**.
    extensions, files over `--max-file-size` (default 5 MiB), and lines longer than 100 000 characters.
    Hidden *directories* (`.github`) are skipped unless `--include-hidden`.
    Hidden *files* such as `.env` are still scanned.
-2. **Format patterns** — public prefixes and shapes (`AKIA…`, `ghp_`, `glpat-`,
+2. **Format patterns** — public prefixes and shapes (`AKIA…` / `ASIA…`, `ghp_`, `glpat-`,
    `xoxb-`, `npm_`, `hf_`, `sk-`, `sk-ant-`, `SG.`, `shpat_`, `dop_v1_`,
-   `whsec_`, PEM headers, JWTs, Stripe `sk_live_`, Azure `AccountKey=`,
+   `whsec_`, `AGE-SECRET-KEY-1`, `pscale_tkn_`, `PMAK-`, PEM headers, JWTs, Stripe `sk_live_`, Azure `AccountKey=`,
    Discord / Slack webhooks, …).
 3. **Context** — sensitive names (`password`, `token`, `api_key`, …) with a
    long-enough value that has no vendor prefix.
@@ -97,8 +97,9 @@ AWS key (typical score around 90).
 
 | Type | Severity |
 |---|---|
-| AWS Access Key ID | CRITICAL |
+| AWS Access Key ID (`AKIA` / `ASIA`) | CRITICAL |
 | Private Key (PEM / OpenSSH header) | CRITICAL |
+| Age Identity Key (`AGE-SECRET-KEY-1`) | CRITICAL |
 | GitHub Token (`ghp_` / `gho_` / …) | HIGH |
 | GitHub Fine-Grained Token (`github_pat_`) | HIGH |
 | Google API Key | HIGH |
@@ -118,6 +119,8 @@ AWS key (typical score around 90).
 | Shopify Token (`shpat_` / `shpss_` / …) | HIGH |
 | DigitalOcean Token (`dop_v1_`) | HIGH |
 | Stripe Webhook Secret (`whsec_`) | HIGH |
+| PlanetScale Token (`pscale_tkn_`) | HIGH |
+| Postman API Key (`PMAK-`) | HIGH |
 | Telegram Bot Token | HIGH |
 | JWT | HIGH |
 | Generic API Key assignment | HIGH |
@@ -559,7 +562,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.32.0
+      - uses: Dryhawell/secret-scanner@v1.33.0
         with:
           include-hidden: true
           fail-on-severity: HIGH
@@ -582,7 +585,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.32.0
+      - uses: Dryhawell/secret-scanner@v1.33.0
         with:
           include-hidden: true
           sarif: true

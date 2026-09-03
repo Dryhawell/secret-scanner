@@ -24,9 +24,9 @@ def default_patterns() -> list[SecretPattern]:
     return [
         SecretPattern(
             name="AWS Access Key ID",
-            regex=r"(?<![A-Z0-9])AKIA[0-9A-Z]{16}(?![A-Z0-9])",
+            regex=r"(?<![A-Z0-9])(?:AKIA|ASIA)[0-9A-Z]{16}(?![A-Z0-9])",
             severity=severity_for("AWS Access Key ID"),
-            description="AWS access key IDs start with AKIA followed by 16 uppercase alphanumerics.",
+            description="AWS access key IDs start with AKIA or ASIA (temporary) followed by 16 uppercase alphanumerics.",
         ),
         SecretPattern(
             name="GitHub Token",
@@ -192,6 +192,25 @@ def default_patterns() -> list[SecretPattern]:
             regex=r"(?<![A-Za-z0-9])whsec_[A-Za-z0-9+/=]{16,}(?![A-Za-z0-9+/=])",
             severity=severity_for("Stripe Webhook Secret"),
             description="Stripe webhook signing secrets start with whsec_ (not sk_live_ API keys).",
+        ),
+        SecretPattern(
+            name="Age Identity Key",
+            regex=r"(?<![A-Za-z0-9-])AGE-SECRET-KEY-1[A-Z0-9]{58}(?![A-Za-z0-9])",
+            severity=severity_for("Age Identity Key"),
+            description="age identity files start with AGE-SECRET-KEY-1 and a 58-character Bech32 payload.",
+            flags=re.IGNORECASE,
+        ),
+        SecretPattern(
+            name="PlanetScale Token",
+            regex=r"(?<![A-Za-z0-9])pscale_tkn_[A-Za-z0-9]{32,}(?![A-Za-z0-9_])",
+            severity=severity_for("PlanetScale Token"),
+            description="PlanetScale service tokens start with pscale_tkn_ and a long payload.",
+        ),
+        SecretPattern(
+            name="Postman API Key",
+            regex=r"(?<![A-Za-z0-9])PMAK-[A-Fa-f0-9]{24}-[A-Za-z0-9]{34}(?![A-Za-z0-9])",
+            severity=severity_for("Postman API Key"),
+            description="Postman API keys look like PMAK-, 24 hex digits, a hyphen, then 34 characters.",
         ),
     ]
 

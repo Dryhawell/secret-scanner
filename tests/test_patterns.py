@@ -37,6 +37,14 @@ def test_aws_access_key_rejects_short_or_lowercase() -> None:
     assert "AWS Access Key ID" not in _match_names("akiaTESTKEYFAKE00000")
 
 
+def test_aws_temporary_asia_key_matches_same_rule() -> None:
+    fake = "ASIA" + "ABCDEFGHIJ012345"
+    names = _match_names(fake)
+    assert "AWS Access Key ID" in names
+    assert "AWS Access Key ID" not in _match_names("ASIA" + "SHORT")
+    assert "AWS Access Key ID" not in _match_names("asiaABCDEFGHIJ012345")
+
+
 def test_github_token_matches_fake_format() -> None:
     assert "GitHub Token" in _match_names(FAKE_GITHUB_TOKEN)
 
@@ -252,6 +260,29 @@ def test_stripe_webhook_secret_is_not_api_key() -> None:
     assert "Stripe Webhook Secret" not in _match_names("whsec_short")
 
 
+def test_age_identity_is_not_pem_private_key() -> None:
+    fake = "AGE-SECRET-KEY-" + "1" + ("A" * 58)
+    names = _match_names(fake)
+    assert "Age Identity Key" in names
+    assert "Private Key" not in names
+    assert "Age Identity Key" not in _match_names("AGE-SECRET-KEY-" + "1" + ("A" * 57))
+    assert "Age Identity Key" not in _match_names("-----BEGIN PRIVATE KEY-----")
+
+
+def test_planetscale_token_matches_fake_format() -> None:
+    fake = "pscale_tkn_" + ("A" * 32)
+    assert "PlanetScale Token" in _match_names(fake)
+    assert "PlanetScale Token" not in _match_names("pscale_tkn_" + "ab")
+
+
+def test_postman_api_key_matches_fake_format() -> None:
+    fake = "PMAK-" + ("a" * 24) + "-" + ("B" * 34)
+    names = _match_names(fake)
+    assert "Postman API Key" in names
+    assert "Postman API Key" not in _match_names("PMAK-" + "short")
+    assert "Postman API Key" not in _match_names("PMAK-" + ("a" * 24))
+
+
 def test_default_catalog_is_non_empty_and_named() -> None:
     patterns = default_patterns()
     names = [pattern.name for pattern in patterns]
@@ -265,3 +296,6 @@ def test_default_catalog_is_non_empty_and_named() -> None:
     assert "Slack Webhook" in names
     assert "DigitalOcean Token" in names
     assert "Stripe Webhook Secret" in names
+    assert "Age Identity Key" in names
+    assert "PlanetScale Token" in names
+    assert "Postman API Key" in names

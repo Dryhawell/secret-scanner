@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.33.0 — 2026-09-03
+
+### Added
+
+- AWS Access Key ID also matches temporary `ASIA` prefixes (same CRITICAL rule)
+- Built-in formats: age identities (`AGE-SECRET-KEY-1`), PlanetScale (`pscale_tkn_`),
+  Postman API keys (`PMAK-`)
+
 ## 1.32.0 — 2026-09-03
 
 ### Added
