@@ -26,6 +26,7 @@ def test_action_yml_is_composite_and_masks_in_logs() -> None:
     assert "SECRET_SCANNER_FAIL_ON_SEVERITY: ${{ inputs.fail-on-severity }}" in text
     assert "SECRET_SCANNER_MAX_FILE_SIZE: ${{ inputs.max-file-size }}" in text
     assert "SECRET_SCANNER_MIN_CONFIDENCE: ${{ inputs.min-confidence }}" in text
+    assert "SECRET_SCANNER_SKIP_PATTERN: ${{ inputs.skip-pattern }}" in text
     assert "SECRET_SCANNER_QUIET: ${{ inputs.quiet }}" in text
     assert "SECRET_SCANNER_SARIF: ${{ inputs.sarif }}" in text
     assert "SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}" in text
@@ -51,6 +52,7 @@ def test_action_run_line_does_not_interpolate_path_into_shell() -> None:
     assert "${{ inputs.fail-on-severity }}" not in run_line
     assert "${{ inputs.max-file-size }}" not in run_line
     assert "${{ inputs.min-confidence }}" not in run_line
+    assert "${{ inputs.skip-pattern }}" not in run_line
     assert "${{ inputs.include-hidden }}" not in run_line
     assert "${{ inputs.quiet }}" not in run_line
     assert "${{ inputs.sarif }}" not in run_line
@@ -327,6 +329,113 @@ def test_action_min_confidence_still_fails_on_aws(tmp_path: Path) -> None:
         log_file=tmp_path / "scan.log",
     )
     assert code == 1
+
+
+def test_argv_skip_pattern_is_opt_in() -> None:
+    argv = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_SKIP_PATTERN": "Contextual Secret",
+        }
+    )
+    assert argv[argv.index("--skip-pattern") + 1] == "Contextual Secret"
+    without = argv_from_env({"SECRET_SCANNER_PATH": "."})
+    assert "--skip-pattern" not in without
+    empty = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_SKIP_PATTERN": "",
+        }
+    )
+    assert "--skip-pattern" not in empty
+
+
+def test_argv_skip_pattern_splits_comma_and_newline() -> None:
+    comma = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_SKIP_PATTERN": "Contextual Secret, Generic Password",
+        }
+    )
+    names = [
+        comma[i + 1]
+        for i, item in enumerate(comma)
+        if item == "--skip-pattern"
+    ]
+    assert names == ["Contextual Secret", "Generic Password"]
+    newline = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_SKIP_PATTERN": "Contextual Secret\nGeneric Password\n",
+        }
+    )
+    names = [
+        newline[i + 1]
+        for i, item in enumerate(newline)
+        if item == "--skip-pattern"
+    ]
+    assert names == ["Contextual Secret", "Generic Password"]
+
+
+def test_argv_rejects_flag_like_skip_pattern() -> None:
+    with pytest.raises(ActionConfigError, match="skip-pattern"):
+        argv_from_env({"SECRET_SCANNER_SKIP_PATTERN": "--update-baseline"})
+    with pytest.raises(ActionConfigError, match="skip-pattern"):
+        argv_from_env(
+            {"SECRET_SCANNER_SKIP_PATTERN": "Contextual Secret,--staged"}
+        )
+    too_many = ", ".join(["AWS Access Key ID"] * 33)
+    with pytest.raises(ActionConfigError, match="skip-pattern"):
+        argv_from_env({"SECRET_SCANNER_SKIP_PATTERN": too_many})
+
+
+def test_action_skip_pattern_hides_contextual(tmp_path: Path) -> None:
+    (tmp_path / "auth.py").write_text(
+        'token = "LocalDevTokenValue1"\n',
+        encoding="utf-8",
+    )
+    code = main(
+        {
+            "SECRET_SCANNER_PATH": str(tmp_path),
+            "SECRET_SCANNER_SKIP_PATTERN": "Contextual Secret",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert code == 0
+
+
+def test_action_skip_pattern_still_fails_on_aws(tmp_path: Path) -> None:
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    (tmp_path / "config.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'\n",
+        encoding="utf-8",
+    )
+    code = main(
+        {
+            "SECRET_SCANNER_PATH": str(tmp_path),
+            "SECRET_SCANNER_SKIP_PATTERN": "Contextual Secret",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert code == 1
+
+
+def test_action_unknown_skip_pattern_exits_two(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    code = main(
+        {
+            "SECRET_SCANNER_PATH": str(tmp_path),
+            "SECRET_SCANNER_SKIP_PATTERN": "Not A Real Rule",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert code == 2
+    assert "--list-patterns" in capsys.readouterr().err
 
 
 def test_action_fail_on_high_exits_zero_on_contextual(tmp_path: Path) -> None:

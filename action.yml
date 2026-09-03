@@ -30,6 +30,10 @@ inputs:
     description: Hide findings below this confidence (0-99; empty = CLI default 0)
     required: false
     default: ""
+  skip-pattern:
+    description: Rule names to disable (comma or newline separated; empty = none)
+    required: false
+    default: ""
   python-version:
     description: Python version for actions/setup-python (3.11 or newer)
     required: false
@@ -65,6 +69,7 @@ runs:
         SECRET_SCANNER_FAIL_ON_SEVERITY: ${{ inputs.fail-on-severity }}
         SECRET_SCANNER_MAX_FILE_SIZE: ${{ inputs.max-file-size }}
         SECRET_SCANNER_MIN_CONFIDENCE: ${{ inputs.min-confidence }}
+        SECRET_SCANNER_SKIP_PATTERN: ${{ inputs.skip-pattern }}
         SECRET_SCANNER_QUIET: ${{ inputs.quiet }}
         SECRET_SCANNER_SARIF: ${{ inputs.sarif }}
         SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}

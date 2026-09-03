@@ -18,6 +18,7 @@ if str(_ROOT) not in sys.path:
 
 from cli.interface import run
 from scanner.confidence import MAX_CONFIDENCE
+from scanner.config_file import MAX_SKIP_PATTERNS
 from scanner.file_handler import MAX_FILE_SIZE_MIB
 
 _SEVERITIES = frozenset({"LOW", "MEDIUM", "HIGH", "CRITICAL"})
@@ -25,6 +26,7 @@ _HIDDEN_TRUE = frozenset({"true", "1", "yes"})
 _HIDDEN_FALSE = frozenset({"false", "0", "no", ""})
 _DEFAULT_SARIF_FILE = "secret-scanner.sarif"
 _MAX_SARIF_PATH = 256
+_MAX_PATTERN_NAME = 128
 
 
 class ActionConfigError(ValueError):
@@ -67,6 +69,30 @@ def _min_confidence_from_env(env: Mapping[str, str]) -> int | None:
             f"min-confidence must be between 0 and {MAX_CONFIDENCE}"
         )
     return value
+
+
+def _skip_patterns_from_env(env: Mapping[str, str]) -> list[str]:
+    """Parse skip-pattern names (comma or newline separated). Empty means omit."""
+    raw = env.get("SECRET_SCANNER_SKIP_PATTERN", "")
+    if not raw.strip():
+        return []
+    names: list[str] = []
+    normalized = raw.replace("\r\n", "\n").replace("\r", "\n")
+    for line in normalized.split("\n"):
+        for piece in line.split(","):
+            name = piece.strip()
+            if not name:
+                continue
+            if name.startswith("-"):
+                raise ActionConfigError("skip-pattern must not look like a CLI flag")
+            if len(name) > _MAX_PATTERN_NAME:
+                raise ActionConfigError("skip-pattern name is too long")
+            names.append(name)
+    if len(names) > MAX_SKIP_PATTERNS:
+        raise ActionConfigError(
+            f"at most {MAX_SKIP_PATTERNS} skip-pattern names are allowed"
+        )
+    return names
 
 
 def _flag_from_env(env: Mapping[str, str], key: str, *, label: str) -> bool:
@@ -124,6 +150,8 @@ def argv_from_env(env: Mapping[str, str]) -> list[str]:
     min_conf = _min_confidence_from_env(env)
     if min_conf is not None:
         argv.extend(["--min-confidence", str(min_conf)])
+    for name in _skip_patterns_from_env(env):
+        argv.extend(["--skip-pattern", name])
     if hidden:
         argv.append("--include-hidden")
     if _flag_from_env(env, "SECRET_SCANNER_QUIET", label="quiet"):

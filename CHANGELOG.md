@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.31.0 — 2026-09-03
+
+### Added
+
+- GitHub Action input `skip-pattern` (comma or newline separated names; via env, not the shell)
+- Flag-like names (leading `-`) are rejected so they cannot become extra CLI flags
+
 ## 1.30.0 — 2026-09-03
 
 ### Added
