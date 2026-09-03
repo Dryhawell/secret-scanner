@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.37.0 — 2026-09-03
+
+### Added
+
+- Built-in formats: Linear (`lin_api_`), Grafana (`glc_` / `glsa_`),
+  Square (`sq0atp-` / `sq0csp-`), Databricks (`dapi`)
+- `--skip-pattern` / `--only-pattern` accept up to 64 names (was 32) so the
+  full catalog can still be skipped
+
 ## 1.36.0 — 2026-09-03
 
 ### Added

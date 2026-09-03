@@ -72,7 +72,7 @@ _FORMATS = frozenset({"text", "json", "sarif", "html"})
 MAX_CUSTOM_PATTERNS = 32
 MAX_CUSTOM_REGEX_LENGTH = 512
 MAX_CUSTOM_NAME_LENGTH = 64
-MAX_SKIP_PATTERNS = 32
+MAX_SKIP_PATTERNS = 64
 _TRUE = frozenset({"true", "yes", "on"})
 _FALSE = frozenset({"false", "no", "off"})
 

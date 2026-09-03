@@ -283,6 +283,52 @@ def test_postman_api_key_matches_fake_format() -> None:
     assert "Postman API Key" not in _match_names("PMAK-" + ("a" * 24))
 
 
+def test_linear_api_key_matches_fake_format() -> None:
+    fake = "lin_api_" + ("A" * 40)
+    names = _match_names(fake)
+    assert "Linear API Key" in names
+    assert "Linear API Key" not in _match_names("lin_api_" + "short")
+    assert "Linear API Key" not in _match_names("lin_api_" + ("A" * 39))
+
+
+def test_grafana_token_matches_cloud_and_service_account() -> None:
+    cloud = "glc_" + ("B" * 24)
+    service = "glsa_" + ("C" * 32) + "_" + ("a" * 8)
+    names = _match_names(cloud)
+    assert "Grafana Token" in names
+    assert "GitLab Token" not in names
+    names = _match_names(service)
+    assert "Grafana Token" in names
+    assert "GitLab Token" not in names
+    gitlab = "glpat-" + "TESTPLACEHOLDER00000"
+    names = _match_names(gitlab)
+    assert "GitLab Token" in names
+    assert "Grafana Token" not in names
+    assert "Grafana Token" not in _match_names("glc_" + ("B" * 19))
+    assert "Grafana Token" not in _match_names("glsa_" + ("C" * 32))
+
+
+def test_square_token_matches_access_and_oauth_secret() -> None:
+    access = "sq0atp-" + ("D" * 22)
+    secret = "sq0csp-" + ("E" * 43)
+    names = _match_names(access)
+    assert "Square Token" in names
+    assert "Shopify Token" not in names
+    names = _match_names(secret)
+    assert "Square Token" in names
+    assert "Square Token" not in _match_names("sq0atp-" + "short")
+    assert "Square Token" not in _match_names("sq0idp-" + ("F" * 22))
+
+
+def test_databricks_token_matches_fake_format() -> None:
+    fake = "dapi" + ("a" * 32)
+    names = _match_names(fake)
+    assert "Databricks Token" in names
+    assert "Databricks Token" in _match_names("dapi" + ("b" * 32) + "-3")
+    assert "Databricks Token" not in _match_names("dapi" + "short")
+    assert "Databricks Token" not in _match_names("dapi" + ("a" * 31))
+
+
 def test_default_catalog_is_non_empty_and_named() -> None:
     patterns = default_patterns()
     names = [pattern.name for pattern in patterns]
@@ -299,3 +345,7 @@ def test_default_catalog_is_non_empty_and_named() -> None:
     assert "Age Identity Key" in names
     assert "PlanetScale Token" in names
     assert "Postman API Key" in names
+    assert "Linear API Key" in names
+    assert "Grafana Token" in names
+    assert "Square Token" in names
+    assert "Databricks Token" in names

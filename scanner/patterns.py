@@ -212,6 +212,36 @@ def default_patterns() -> list[SecretPattern]:
             severity=severity_for("Postman API Key"),
             description="Postman API keys look like PMAK-, 24 hex digits, a hyphen, then 34 characters.",
         ),
+        SecretPattern(
+            name="Linear API Key",
+            regex=r"(?<![A-Za-z0-9])lin_api_[A-Za-z0-9]{40}(?![A-Za-z0-9])",
+            severity=severity_for("Linear API Key"),
+            description="Linear API keys start with lin_api_ followed by 40 alphanumeric characters.",
+        ),
+        SecretPattern(
+            name="Grafana Token",
+            regex=(
+                r"(?<![A-Za-z0-9])(?:glsa_[A-Za-z0-9]{32}_[A-Fa-f0-9]{8}"
+                r"|glc_[A-Za-z0-9+/=_-]{20,})(?![A-Za-z0-9+/=_-])"
+            ),
+            severity=severity_for("Grafana Token"),
+            description="Grafana tokens use glc_ (Cloud) or glsa_ (service account) prefixes.",
+        ),
+        SecretPattern(
+            name="Square Token",
+            regex=(
+                r"(?<![A-Za-z0-9])(?:sq0atp-[A-Za-z0-9_-]{22}"
+                r"|sq0csp-[A-Za-z0-9_-]{43})(?![A-Za-z0-9_-])"
+            ),
+            severity=severity_for("Square Token"),
+            description="Square access tokens use sq0atp-; OAuth application secrets use sq0csp-.",
+        ),
+        SecretPattern(
+            name="Databricks Token",
+            regex=r"(?<![A-Za-z0-9])dapi[a-fA-F0-9]{32}(?:-\d)?(?![A-Za-z0-9])",
+            severity=severity_for("Databricks Token"),
+            description="Databricks personal access tokens start with dapi and 32 hex digits.",
+        ),
     ]
 
 

@@ -59,6 +59,10 @@ PATTERN_SEVERITY: dict[str, Severity] = {
     "Stripe Webhook Secret": Severity.HIGH,
     "PlanetScale Token": Severity.HIGH,
     "Postman API Key": Severity.HIGH,
+    "Linear API Key": Severity.HIGH,
+    "Grafana Token": Severity.HIGH,
+    "Square Token": Severity.HIGH,
+    "Databricks Token": Severity.HIGH,
     # MEDIUM: likely credentials, but often placeholders or local secrets.
     "Generic Password": Severity.MEDIUM,
     # MEDIUM: variable name is sensitive, value has no known vendor format.

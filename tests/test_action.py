@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from cli.github_action import ActionConfigError, argv_from_env, main
+from scanner.config_file import MAX_SKIP_PATTERNS
 from scanner.file_handler import MIB
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -394,7 +395,7 @@ def test_argv_rejects_flag_like_skip_pattern() -> None:
         argv_from_env(
             {"SECRET_SCANNER_SKIP_PATTERN": "Contextual Secret,--staged"}
         )
-    too_many = ", ".join(["AWS Access Key ID"] * 33)
+    too_many = ", ".join(["AWS Access Key ID"] * (MAX_SKIP_PATTERNS + 1))
     with pytest.raises(ActionConfigError, match="skip-pattern"):
         argv_from_env({"SECRET_SCANNER_SKIP_PATTERN": too_many})
 
@@ -708,7 +709,7 @@ def test_argv_rejects_flag_like_exclude() -> None:
         argv_from_env({"SECRET_SCANNER_EXCLUDE": "vendor/lib"})
     with pytest.raises(ActionConfigError, match="exclude"):
         argv_from_env({"SECRET_SCANNER_EXCLUDE": r"vendor\lib"})
-    too_many = ", ".join(["vendor"] * 33)
+    too_many = ", ".join(["vendor"] * (MAX_SKIP_PATTERNS + 1))
     with pytest.raises(ActionConfigError, match="exclude"):
         argv_from_env({"SECRET_SCANNER_EXCLUDE": too_many})
 

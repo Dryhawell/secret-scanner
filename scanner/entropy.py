@@ -49,6 +49,10 @@ FORMAT_LOCKED_PATTERNS: frozenset[str] = frozenset(
         "Age Identity Key",
         "PlanetScale Token",
         "Postman API Key",
+        "Linear API Key",
+        "Grafana Token",
+        "Square Token",
+        "Databricks Token",
     }
 )
 
