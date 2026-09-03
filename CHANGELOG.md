@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.35.0 — 2026-09-03
+
+### Added
+
+- GitHub Action input `jobs` (empty = CLI default 1; `0` = CPU count; max 32; via env, not the shell)
+
 ## 1.34.0 — 2026-09-03
 
 ### Added

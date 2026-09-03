@@ -22,6 +22,7 @@ from scanner.config_file import MAX_SKIP_PATTERNS
 from scanner.file_handler import (
     MAX_FILE_SIZE_MIB,
     MAX_GLOBS,
+    MAX_JOBS,
     GlobError,
     normalize_glob,
 )
@@ -72,6 +73,25 @@ def _min_confidence_from_env(env: Mapping[str, str]) -> int | None:
     if value < 0 or value > MAX_CONFIDENCE:
         raise ActionConfigError(
             f"min-confidence must be between 0 and {MAX_CONFIDENCE}"
+        )
+    return value
+
+
+def _jobs_from_env(env: Mapping[str, str]) -> int | None:
+    """Parse jobs. Empty/missing means omit (CLI default 1). 0 means auto."""
+    raw = env.get("SECRET_SCANNER_JOBS", "")
+    text = raw.strip()
+    if not text:
+        return None
+    if "\n" in raw or "\r" in raw:
+        raise ActionConfigError("jobs must be a single line")
+    try:
+        value = int(text)
+    except ValueError as exc:
+        raise ActionConfigError("jobs must be an integer") from exc
+    if value < 0 or value > MAX_JOBS:
+        raise ActionConfigError(
+            f"jobs must be between 0 and {MAX_JOBS} (0 = auto)"
         )
     return value
 
@@ -178,6 +198,9 @@ def argv_from_env(env: Mapping[str, str]) -> list[str]:
     min_conf = _min_confidence_from_env(env)
     if min_conf is not None:
         argv.extend(["--min-confidence", str(min_conf)])
+    jobs = _jobs_from_env(env)
+    if jobs is not None:
+        argv.extend(["--jobs", str(jobs)])
     for name in _pattern_names_from_env(
         env, "SECRET_SCANNER_ONLY_PATTERN", label="only-pattern"
     ):

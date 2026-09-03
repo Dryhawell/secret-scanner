@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.34.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.35.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.34.0
+# Secret Scanner 1.35.0
 ```
 
 ## Why Secret Scanner?
@@ -40,8 +40,9 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
-- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.34.0`)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.35.0`)
 - `--jobs` worker threads for file scans (default 1)
+- GitHub Action input `jobs` (empty = CLI default 1; `0` = CPU count)
 - Localhost HTML dashboard (`--dashboard`)
 - Path / finding allowlist (`.secret-scanner-ignore`) and inline `secret-scanner:ignore`
 - Hashed finding baseline (SHA-256, no plaintext)
@@ -563,7 +564,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.34.0
+      - uses: Dryhawell/secret-scanner@v1.35.0
         with:
           include-hidden: true
           fail-on-severity: HIGH
@@ -571,6 +572,7 @@ jobs:
           min-confidence: 80
           skip-pattern: Contextual Secret
           glob: "*.py"
+          jobs: 4
 ```
 
 Code Scanning upload is **opt-in**. The composite action cannot grant
@@ -587,7 +589,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.34.0
+      - uses: Dryhawell/secret-scanner@v1.35.0
         with:
           include-hidden: true
           sarif: true
@@ -599,7 +601,8 @@ Inputs: `path` (default `.`), `include-hidden`, `severity`,
 (empty = CLI default 0; 0–99), `skip-pattern` (comma or newline separated
 names; empty = none), `only-pattern` (allowlist; empty = all rules;
 applied before `skip-pattern`), `glob` / `skip-glob` (comma or newline
-separated `fnmatch` patterns; empty = no extra file filter), `python-version`,
+separated `fnmatch` patterns; empty = no extra file filter), `jobs`
+(empty = CLI default 1; `0` = CPU count; max 32), `python-version`,
 `quiet` (default false; keep false so masked findings stay in the job log),
 `sarif` (default false), `sarif-file` (default `secret-scanner.sarif`,
 workspace-relative only). The action always passes `--no-color` (Actions logs).
@@ -638,7 +641,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, `--max-file-size`, oversized skip counts, binary skip counts, GitHub Action SARIF upload, `--fail-on-severity`, GitHub Action `max-file-size`, GitHub Action `min-confidence`, GitHub Action `skip-pattern`, GitHub Action `only-pattern`, GitHub Action `glob` / `skip-glob`, parallel file scans, the localhost dashboard, the hook
+and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, `--max-file-size`, oversized skip counts, binary skip counts, GitHub Action SARIF upload, `--fail-on-severity`, GitHub Action `max-file-size`, GitHub Action `min-confidence`, GitHub Action `skip-pattern`, GitHub Action `only-pattern`, GitHub Action `glob` / `skip-glob`, GitHub Action `jobs`, parallel file scans, the localhost dashboard, the hook
 installer, project config files, custom patterns, SARIF and HTML reports, and
 the CI workflow file. All credentials in tests are fakes.
 
@@ -688,7 +691,7 @@ the CI workflow file. All credentials in tests are fakes.
 - `--jobs` uses threads (`concurrent.futures`). CPython's GIL means regex
   matching does not scale linearly with cores; overlapping file reads still
   help. Default is 1 (same as a sequential scan). `--history` and `--stdin` stay
-  single-threaded.
+  single-threaded. The Action input `jobs` is the same knob (empty = default 1).
 - `--stdin` scans one in-memory buffer, not a repository walk. A TTY is
   refused (exit 2). The same `--max-file-size` cap as files applies.
 - Detection is never 100% accurate.
@@ -721,7 +724,7 @@ the CI workflow file. All credentials in tests are fakes.
 ```text
 main.py                 entry point (exit code from cli)
 cli/interface.py        argparse, text/JSON output, Git flags, --stdin, --quiet, --min-confidence, --fail-on-severity, --list-patterns, --only-pattern, --max-file-size
-cli/github_action.py    composite-action argv (env → CLI, --no-color, optional SARIF, fail-on-severity, max-file-size, min-confidence, skip-pattern, only-pattern, glob, skip-glob)
+cli/github_action.py    composite-action argv (env → CLI, --no-color, optional SARIF, fail-on-severity, max-file-size, min-confidence, skip-pattern, only-pattern, glob, skip-glob, jobs)
 cli/dashboard.py        localhost HTML dashboard (127.0.0.1)
 scanner/
   file_handler.py       discovery, excludes, globs, binary/size caps, skip counts

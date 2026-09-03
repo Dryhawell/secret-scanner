@@ -46,6 +46,10 @@ inputs:
     description: Skip files matching these globs (comma or newline separated; empty = none)
     required: false
     default: ""
+  jobs:
+    description: Worker threads for file scans (empty = CLI default 1; 0 = CPU count; max 32)
+    required: false
+    default: ""
   python-version:
     description: Python version for actions/setup-python (3.11 or newer)
     required: false
@@ -85,6 +89,7 @@ runs:
         SECRET_SCANNER_ONLY_PATTERN: ${{ inputs.only-pattern }}
         SECRET_SCANNER_GLOB: ${{ inputs.glob }}
         SECRET_SCANNER_SKIP_GLOB: ${{ inputs.skip-glob }}
+        SECRET_SCANNER_JOBS: ${{ inputs.jobs }}
         SECRET_SCANNER_QUIET: ${{ inputs.quiet }}
         SECRET_SCANNER_SARIF: ${{ inputs.sarif }}
         SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}

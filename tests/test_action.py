@@ -30,6 +30,7 @@ def test_action_yml_is_composite_and_masks_in_logs() -> None:
     assert "SECRET_SCANNER_ONLY_PATTERN: ${{ inputs.only-pattern }}" in text
     assert "SECRET_SCANNER_GLOB: ${{ inputs.glob }}" in text
     assert "SECRET_SCANNER_SKIP_GLOB: ${{ inputs.skip-glob }}" in text
+    assert "SECRET_SCANNER_JOBS: ${{ inputs.jobs }}" in text
     assert "SECRET_SCANNER_QUIET: ${{ inputs.quiet }}" in text
     assert "SECRET_SCANNER_SARIF: ${{ inputs.sarif }}" in text
     assert "SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}" in text
@@ -59,6 +60,7 @@ def test_action_run_line_does_not_interpolate_path_into_shell() -> None:
     assert "${{ inputs.only-pattern }}" not in run_line
     assert "${{ inputs.glob }}" not in run_line
     assert "${{ inputs.skip-glob }}" not in run_line
+    assert "${{ inputs.jobs }}" not in run_line
     assert "${{ inputs.include-hidden }}" not in run_line
     assert "${{ inputs.quiet }}" not in run_line
     assert "${{ inputs.sarif }}" not in run_line
@@ -655,6 +657,63 @@ def test_action_skip_glob_skips_leaky_file(tmp_path: Path) -> None:
         log_file=tmp_path / "scan.log",
     )
     assert code == 0
+
+
+def test_argv_jobs_is_opt_in() -> None:
+    argv = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_JOBS": "4",
+        }
+    )
+    assert argv[argv.index("--jobs") + 1] == "4"
+    without = argv_from_env({"SECRET_SCANNER_PATH": "."})
+    assert "--jobs" not in without
+    empty = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_JOBS": "",
+        }
+    )
+    assert "--jobs" not in empty
+    auto = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_JOBS": "0",
+        }
+    )
+    assert auto[auto.index("--jobs") + 1] == "0"
+
+
+def test_argv_rejects_invalid_jobs() -> None:
+    with pytest.raises(ActionConfigError, match="jobs"):
+        argv_from_env({"SECRET_SCANNER_JOBS": "abc"})
+    with pytest.raises(ActionConfigError, match="jobs"):
+        argv_from_env({"SECRET_SCANNER_JOBS": "-1"})
+    with pytest.raises(ActionConfigError, match="jobs"):
+        argv_from_env({"SECRET_SCANNER_JOBS": "33"})
+    assert main({"SECRET_SCANNER_JOBS": "abc"}) == 2
+
+
+def test_action_jobs_still_finds_aws(tmp_path: Path) -> None:
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    (tmp_path / "a.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "b.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'\n",
+        encoding="utf-8",
+    )
+    code = main(
+        {
+            "SECRET_SCANNER_PATH": str(tmp_path),
+            "SECRET_SCANNER_JOBS": "4",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert code == 1
 
 
 def test_action_fail_on_high_exits_zero_on_contextual(tmp_path: Path) -> None:
