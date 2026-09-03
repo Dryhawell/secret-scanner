@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.30.0 — 2026-09-03
+
+### Added
+
+- GitHub Action input `min-confidence` (empty = CLI default 0; 0–99; via env, not the shell)
+
 ## 1.29.0 — 2026-09-02
 
 ### Added

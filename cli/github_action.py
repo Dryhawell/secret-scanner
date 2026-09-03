@@ -17,6 +17,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from cli.interface import run
+from scanner.confidence import MAX_CONFIDENCE
 from scanner.file_handler import MAX_FILE_SIZE_MIB
 
 _SEVERITIES = frozenset({"LOW", "MEDIUM", "HIGH", "CRITICAL"})
@@ -45,6 +46,25 @@ def _max_file_size_from_env(env: Mapping[str, str]) -> int | None:
     if value < 0 or value > MAX_FILE_SIZE_MIB:
         raise ActionConfigError(
             f"max-file-size must be between 0 and {MAX_FILE_SIZE_MIB} (0 = unlimited)"
+        )
+    return value
+
+
+def _min_confidence_from_env(env: Mapping[str, str]) -> int | None:
+    """Parse min-confidence. Empty/missing means omit (CLI default 0)."""
+    raw = env.get("SECRET_SCANNER_MIN_CONFIDENCE", "")
+    text = raw.strip()
+    if not text:
+        return None
+    if "\n" in raw or "\r" in raw:
+        raise ActionConfigError("min-confidence must be a single line")
+    try:
+        value = int(text)
+    except ValueError as exc:
+        raise ActionConfigError("min-confidence must be an integer") from exc
+    if value < 0 or value > MAX_CONFIDENCE:
+        raise ActionConfigError(
+            f"min-confidence must be between 0 and {MAX_CONFIDENCE}"
         )
     return value
 
@@ -101,6 +121,9 @@ def argv_from_env(env: Mapping[str, str]) -> list[str]:
     max_mib = _max_file_size_from_env(env)
     if max_mib is not None:
         argv.extend(["--max-file-size", str(max_mib)])
+    min_conf = _min_confidence_from_env(env)
+    if min_conf is not None:
+        argv.extend(["--min-confidence", str(min_conf)])
     if hidden:
         argv.append("--include-hidden")
     if _flag_from_env(env, "SECRET_SCANNER_QUIET", label="quiet"):

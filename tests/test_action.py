@@ -25,6 +25,7 @@ def test_action_yml_is_composite_and_masks_in_logs() -> None:
     assert "SECRET_SCANNER_SEVERITY: ${{ inputs.severity }}" in text
     assert "SECRET_SCANNER_FAIL_ON_SEVERITY: ${{ inputs.fail-on-severity }}" in text
     assert "SECRET_SCANNER_MAX_FILE_SIZE: ${{ inputs.max-file-size }}" in text
+    assert "SECRET_SCANNER_MIN_CONFIDENCE: ${{ inputs.min-confidence }}" in text
     assert "SECRET_SCANNER_QUIET: ${{ inputs.quiet }}" in text
     assert "SECRET_SCANNER_SARIF: ${{ inputs.sarif }}" in text
     assert "SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}" in text
@@ -49,6 +50,7 @@ def test_action_run_line_does_not_interpolate_path_into_shell() -> None:
     assert "${{ inputs.severity }}" not in run_line
     assert "${{ inputs.fail-on-severity }}" not in run_line
     assert "${{ inputs.max-file-size }}" not in run_line
+    assert "${{ inputs.min-confidence }}" not in run_line
     assert "${{ inputs.include-hidden }}" not in run_line
     assert "${{ inputs.quiet }}" not in run_line
     assert "${{ inputs.sarif }}" not in run_line
@@ -249,6 +251,77 @@ def test_action_max_file_size_zero_scans_large_file(tmp_path: Path) -> None:
         {
             "SECRET_SCANNER_PATH": str(src),
             "SECRET_SCANNER_MAX_FILE_SIZE": "0",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert code == 1
+
+
+def test_argv_min_confidence_is_opt_in() -> None:
+    argv = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_MIN_CONFIDENCE": "80",
+        }
+    )
+    assert argv[argv.index("--min-confidence") + 1] == "80"
+    without = argv_from_env({"SECRET_SCANNER_PATH": "."})
+    assert "--min-confidence" not in without
+    empty = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_MIN_CONFIDENCE": "",
+        }
+    )
+    assert "--min-confidence" not in empty
+    zero = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_MIN_CONFIDENCE": "0",
+        }
+    )
+    assert zero[zero.index("--min-confidence") + 1] == "0"
+
+
+def test_argv_rejects_invalid_min_confidence() -> None:
+    with pytest.raises(ActionConfigError, match="min-confidence"):
+        argv_from_env({"SECRET_SCANNER_MIN_CONFIDENCE": "abc"})
+    with pytest.raises(ActionConfigError, match="min-confidence"):
+        argv_from_env({"SECRET_SCANNER_MIN_CONFIDENCE": "-1"})
+    with pytest.raises(ActionConfigError, match="min-confidence"):
+        argv_from_env({"SECRET_SCANNER_MIN_CONFIDENCE": "100"})
+    with pytest.raises(ActionConfigError, match="min-confidence"):
+        argv_from_env({"SECRET_SCANNER_MIN_CONFIDENCE": "80\n1"})
+    assert main({"SECRET_SCANNER_MIN_CONFIDENCE": "abc"}) == 2
+
+
+def test_action_min_confidence_hides_contextual(tmp_path: Path) -> None:
+    (tmp_path / "auth.py").write_text(
+        'token = "LocalDevTokenValue1"\n',
+        encoding="utf-8",
+    )
+    code = main(
+        {
+            "SECRET_SCANNER_PATH": str(tmp_path),
+            "SECRET_SCANNER_MIN_CONFIDENCE": "80",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert code == 0
+
+
+def test_action_min_confidence_still_fails_on_aws(tmp_path: Path) -> None:
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    (tmp_path / "config.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'\n",
+        encoding="utf-8",
+    )
+    code = main(
+        {
+            "SECRET_SCANNER_PATH": str(tmp_path),
+            "SECRET_SCANNER_MIN_CONFIDENCE": "80",
         },
         reports_dir=tmp_path / "reports",
         log_file=tmp_path / "scan.log",
