@@ -28,6 +28,8 @@ def test_action_yml_is_composite_and_masks_in_logs() -> None:
     assert "SECRET_SCANNER_MIN_CONFIDENCE: ${{ inputs.min-confidence }}" in text
     assert "SECRET_SCANNER_SKIP_PATTERN: ${{ inputs.skip-pattern }}" in text
     assert "SECRET_SCANNER_ONLY_PATTERN: ${{ inputs.only-pattern }}" in text
+    assert "SECRET_SCANNER_GLOB: ${{ inputs.glob }}" in text
+    assert "SECRET_SCANNER_SKIP_GLOB: ${{ inputs.skip-glob }}" in text
     assert "SECRET_SCANNER_QUIET: ${{ inputs.quiet }}" in text
     assert "SECRET_SCANNER_SARIF: ${{ inputs.sarif }}" in text
     assert "SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}" in text
@@ -55,6 +57,8 @@ def test_action_run_line_does_not_interpolate_path_into_shell() -> None:
     assert "${{ inputs.min-confidence }}" not in run_line
     assert "${{ inputs.skip-pattern }}" not in run_line
     assert "${{ inputs.only-pattern }}" not in run_line
+    assert "${{ inputs.glob }}" not in run_line
+    assert "${{ inputs.skip-glob }}" not in run_line
     assert "${{ inputs.include-hidden }}" not in run_line
     assert "${{ inputs.quiet }}" not in run_line
     assert "${{ inputs.sarif }}" not in run_line
@@ -557,6 +561,100 @@ def test_action_unknown_only_pattern_exits_two(
     )
     assert code == 2
     assert "--list-patterns" in capsys.readouterr().err
+
+
+def test_argv_glob_is_opt_in() -> None:
+    argv = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_GLOB": "*.env",
+        }
+    )
+    assert argv[argv.index("--glob") + 1] == "*.env"
+    without = argv_from_env({"SECRET_SCANNER_PATH": "."})
+    assert "--glob" not in without
+    assert "--skip-glob" not in without
+    empty = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_GLOB": "",
+            "SECRET_SCANNER_SKIP_GLOB": "",
+        }
+    )
+    assert "--glob" not in empty
+    assert "--skip-glob" not in empty
+
+
+def test_argv_glob_splits_comma_and_newline() -> None:
+    comma = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_GLOB": "*.env, *.py",
+        }
+    )
+    patterns = [comma[i + 1] for i, item in enumerate(comma) if item == "--glob"]
+    assert patterns == ["*.env", "*.py"]
+    newline = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_SKIP_GLOB": "*.md\n*.txt\n",
+        }
+    )
+    patterns = [
+        newline[i + 1] for i, item in enumerate(newline) if item == "--skip-glob"
+    ]
+    assert patterns == ["*.md", "*.txt"]
+
+
+def test_argv_rejects_flag_like_glob() -> None:
+    with pytest.raises(ActionConfigError, match="glob"):
+        argv_from_env({"SECRET_SCANNER_GLOB": "--staged"})
+    with pytest.raises(ActionConfigError, match="skip-glob"):
+        argv_from_env({"SECRET_SCANNER_SKIP_GLOB": "--update-baseline"})
+
+
+def test_action_glob_hides_non_matching_leak(tmp_path: Path) -> None:
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    (tmp_path / "app.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".env").write_text("EXAMPLE=placeholder\n", encoding="utf-8")
+    missed = main(
+        {
+            "SECRET_SCANNER_PATH": str(tmp_path),
+            "SECRET_SCANNER_GLOB": "*.env",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert missed == 0
+    hit = main(
+        {
+            "SECRET_SCANNER_PATH": str(tmp_path),
+            "SECRET_SCANNER_GLOB": "*.py",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert hit == 1
+
+
+def test_action_skip_glob_skips_leaky_file(tmp_path: Path) -> None:
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    (tmp_path / "app.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'\n",
+        encoding="utf-8",
+    )
+    code = main(
+        {
+            "SECRET_SCANNER_PATH": str(tmp_path),
+            "SECRET_SCANNER_SKIP_GLOB": "*.py",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert code == 0
 
 
 def test_action_fail_on_high_exits_zero_on_contextual(tmp_path: Path) -> None:

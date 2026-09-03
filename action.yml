@@ -38,6 +38,14 @@ inputs:
     description: Only run these rules (comma or newline separated; empty = all; applied before skip-pattern)
     required: false
     default: ""
+  glob:
+    description: Only scan files matching these globs (comma or newline separated; empty = all files)
+    required: false
+    default: ""
+  skip-glob:
+    description: Skip files matching these globs (comma or newline separated; empty = none)
+    required: false
+    default: ""
   python-version:
     description: Python version for actions/setup-python (3.11 or newer)
     required: false
@@ -75,6 +83,8 @@ runs:
         SECRET_SCANNER_MIN_CONFIDENCE: ${{ inputs.min-confidence }}
         SECRET_SCANNER_SKIP_PATTERN: ${{ inputs.skip-pattern }}
         SECRET_SCANNER_ONLY_PATTERN: ${{ inputs.only-pattern }}
+        SECRET_SCANNER_GLOB: ${{ inputs.glob }}
+        SECRET_SCANNER_SKIP_GLOB: ${{ inputs.skip-glob }}
         SECRET_SCANNER_QUIET: ${{ inputs.quiet }}
         SECRET_SCANNER_SARIF: ${{ inputs.sarif }}
         SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.34.0 — 2026-09-03
+
+### Added
+
+- GitHub Action inputs `glob` and `skip-glob` (comma or newline separated `fnmatch`; via env, not the shell)
+- Flag-like patterns (leading `-`) are rejected by the same glob rules as the CLI
+
 ## 1.33.0 — 2026-09-03
 
 ### Added

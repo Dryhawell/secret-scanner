@@ -19,7 +19,12 @@ if str(_ROOT) not in sys.path:
 from cli.interface import run
 from scanner.confidence import MAX_CONFIDENCE
 from scanner.config_file import MAX_SKIP_PATTERNS
-from scanner.file_handler import MAX_FILE_SIZE_MIB
+from scanner.file_handler import (
+    MAX_FILE_SIZE_MIB,
+    MAX_GLOBS,
+    GlobError,
+    normalize_glob,
+)
 
 _SEVERITIES = frozenset({"LOW", "MEDIUM", "HIGH", "CRITICAL"})
 _HIDDEN_TRUE = frozenset({"true", "1", "yes"})
@@ -97,6 +102,27 @@ def _pattern_names_from_env(
     return names
 
 
+def _globs_from_env(env: Mapping[str, str], key: str, *, label: str) -> list[str]:
+    """Parse glob patterns (comma or newline separated). Empty means omit."""
+    raw = env.get(key, "")
+    if not raw.strip():
+        return []
+    patterns: list[str] = []
+    normalized = raw.replace("\r\n", "\n").replace("\r", "\n")
+    for line in normalized.split("\n"):
+        for piece in line.split(","):
+            item = piece.strip()
+            if not item:
+                continue
+            try:
+                patterns.append(normalize_glob(item))
+            except GlobError as exc:
+                raise ActionConfigError(f"{label}: {exc}") from exc
+    if len(patterns) > MAX_GLOBS:
+        raise ActionConfigError(f"at most {MAX_GLOBS} {label} patterns are allowed")
+    return patterns
+
+
 def _flag_from_env(env: Mapping[str, str], key: str, *, label: str) -> bool:
     raw = env.get(key, "false").strip().casefold()
     if raw not in _HIDDEN_TRUE | _HIDDEN_FALSE:
@@ -160,6 +186,12 @@ def argv_from_env(env: Mapping[str, str]) -> list[str]:
         env, "SECRET_SCANNER_SKIP_PATTERN", label="skip-pattern"
     ):
         argv.extend(["--skip-pattern", name])
+    for pattern in _globs_from_env(env, "SECRET_SCANNER_GLOB", label="glob"):
+        argv.extend(["--glob", pattern])
+    for pattern in _globs_from_env(
+        env, "SECRET_SCANNER_SKIP_GLOB", label="skip-glob"
+    ):
+        argv.extend(["--skip-glob", pattern])
     if hidden:
         argv.append("--include-hidden")
     if _flag_from_env(env, "SECRET_SCANNER_QUIET", label="quiet"):
