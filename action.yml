@@ -34,6 +34,10 @@ inputs:
     description: Rule names to disable (comma or newline separated; empty = none)
     required: false
     default: ""
+  only-pattern:
+    description: Only run these rules (comma or newline separated; empty = all; applied before skip-pattern)
+    required: false
+    default: ""
   python-version:
     description: Python version for actions/setup-python (3.11 or newer)
     required: false
@@ -70,6 +74,7 @@ runs:
         SECRET_SCANNER_MAX_FILE_SIZE: ${{ inputs.max-file-size }}
         SECRET_SCANNER_MIN_CONFIDENCE: ${{ inputs.min-confidence }}
         SECRET_SCANNER_SKIP_PATTERN: ${{ inputs.skip-pattern }}
+        SECRET_SCANNER_ONLY_PATTERN: ${{ inputs.only-pattern }}
         SECRET_SCANNER_QUIET: ${{ inputs.quiet }}
         SECRET_SCANNER_SARIF: ${{ inputs.sarif }}
         SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}

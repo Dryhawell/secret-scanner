@@ -71,9 +71,11 @@ def _min_confidence_from_env(env: Mapping[str, str]) -> int | None:
     return value
 
 
-def _skip_patterns_from_env(env: Mapping[str, str]) -> list[str]:
-    """Parse skip-pattern names (comma or newline separated). Empty means omit."""
-    raw = env.get("SECRET_SCANNER_SKIP_PATTERN", "")
+def _pattern_names_from_env(
+    env: Mapping[str, str], key: str, *, label: str
+) -> list[str]:
+    """Parse rule names (comma or newline separated). Empty means omit."""
+    raw = env.get(key, "")
     if not raw.strip():
         return []
     names: list[str] = []
@@ -84,13 +86,13 @@ def _skip_patterns_from_env(env: Mapping[str, str]) -> list[str]:
             if not name:
                 continue
             if name.startswith("-"):
-                raise ActionConfigError("skip-pattern must not look like a CLI flag")
+                raise ActionConfigError(f"{label} must not look like a CLI flag")
             if len(name) > _MAX_PATTERN_NAME:
-                raise ActionConfigError("skip-pattern name is too long")
+                raise ActionConfigError(f"{label} name is too long")
             names.append(name)
     if len(names) > MAX_SKIP_PATTERNS:
         raise ActionConfigError(
-            f"at most {MAX_SKIP_PATTERNS} skip-pattern names are allowed"
+            f"at most {MAX_SKIP_PATTERNS} {label} names are allowed"
         )
     return names
 
@@ -150,7 +152,13 @@ def argv_from_env(env: Mapping[str, str]) -> list[str]:
     min_conf = _min_confidence_from_env(env)
     if min_conf is not None:
         argv.extend(["--min-confidence", str(min_conf)])
-    for name in _skip_patterns_from_env(env):
+    for name in _pattern_names_from_env(
+        env, "SECRET_SCANNER_ONLY_PATTERN", label="only-pattern"
+    ):
+        argv.extend(["--only-pattern", name])
+    for name in _pattern_names_from_env(
+        env, "SECRET_SCANNER_SKIP_PATTERN", label="skip-pattern"
+    ):
         argv.extend(["--skip-pattern", name])
     if hidden:
         argv.append("--include-hidden")

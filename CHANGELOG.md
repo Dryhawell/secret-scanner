@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.32.0 — 2026-09-03
+
+### Added
+
+- GitHub Action input `only-pattern` (allowlist; comma or newline separated; via env, not the shell)
+- Combined with `skip-pattern` until no rules remain, the action still exits 2
+
 ## 1.31.0 — 2026-09-03
 
 ### Added
