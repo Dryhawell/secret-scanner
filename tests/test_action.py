@@ -30,6 +30,7 @@ def test_action_yml_is_composite_and_masks_in_logs() -> None:
     assert "SECRET_SCANNER_ONLY_PATTERN: ${{ inputs.only-pattern }}" in text
     assert "SECRET_SCANNER_GLOB: ${{ inputs.glob }}" in text
     assert "SECRET_SCANNER_SKIP_GLOB: ${{ inputs.skip-glob }}" in text
+    assert "SECRET_SCANNER_EXCLUDE: ${{ inputs.exclude }}" in text
     assert "SECRET_SCANNER_JOBS: ${{ inputs.jobs }}" in text
     assert "SECRET_SCANNER_QUIET: ${{ inputs.quiet }}" in text
     assert "SECRET_SCANNER_SARIF: ${{ inputs.sarif }}" in text
@@ -60,6 +61,7 @@ def test_action_run_line_does_not_interpolate_path_into_shell() -> None:
     assert "${{ inputs.only-pattern }}" not in run_line
     assert "${{ inputs.glob }}" not in run_line
     assert "${{ inputs.skip-glob }}" not in run_line
+    assert "${{ inputs.exclude }}" not in run_line
     assert "${{ inputs.jobs }}" not in run_line
     assert "${{ inputs.include-hidden }}" not in run_line
     assert "${{ inputs.quiet }}" not in run_line
@@ -657,6 +659,109 @@ def test_action_skip_glob_skips_leaky_file(tmp_path: Path) -> None:
         log_file=tmp_path / "scan.log",
     )
     assert code == 0
+
+
+def test_argv_exclude_is_opt_in() -> None:
+    argv = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_EXCLUDE": "vendor",
+        }
+    )
+    assert argv[argv.index("--exclude") + 1] == "vendor"
+    without = argv_from_env({"SECRET_SCANNER_PATH": "."})
+    assert "--exclude" not in without
+    empty = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_EXCLUDE": "",
+        }
+    )
+    assert "--exclude" not in empty
+
+
+def test_argv_exclude_splits_comma_and_newline() -> None:
+    comma = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_EXCLUDE": "vendor, dist",
+        }
+    )
+    names = [comma[i + 1] for i, item in enumerate(comma) if item == "--exclude"]
+    assert names == ["vendor", "dist"]
+    newline = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_EXCLUDE": "vendor\ndist\n",
+        }
+    )
+    names = [
+        newline[i + 1] for i, item in enumerate(newline) if item == "--exclude"
+    ]
+    assert names == ["vendor", "dist"]
+
+
+def test_argv_rejects_flag_like_exclude() -> None:
+    with pytest.raises(ActionConfigError, match="exclude"):
+        argv_from_env({"SECRET_SCANNER_EXCLUDE": "--update-baseline"})
+    with pytest.raises(ActionConfigError, match="exclude"):
+        argv_from_env({"SECRET_SCANNER_EXCLUDE": "vendor/lib"})
+    with pytest.raises(ActionConfigError, match="exclude"):
+        argv_from_env({"SECRET_SCANNER_EXCLUDE": r"vendor\lib"})
+    too_many = ", ".join(["vendor"] * 33)
+    with pytest.raises(ActionConfigError, match="exclude"):
+        argv_from_env({"SECRET_SCANNER_EXCLUDE": too_many})
+
+
+def test_action_exclude_skips_leaky_dir(tmp_path: Path) -> None:
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    vendor = tmp_path / "Vendor"
+    vendor.mkdir()
+    (vendor / "keys.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    skipped = main(
+        {
+            "SECRET_SCANNER_PATH": str(tmp_path),
+            "SECRET_SCANNER_EXCLUDE": "vendor",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert skipped == 0
+    hit = main(
+        {
+            "SECRET_SCANNER_PATH": str(tmp_path),
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert hit == 1
+
+
+def test_action_exclude_still_finds_outside_dir(tmp_path: Path) -> None:
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    vendor = tmp_path / "vendor"
+    vendor.mkdir()
+    (vendor / "keys.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "app.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'\n",
+        encoding="utf-8",
+    )
+    code = main(
+        {
+            "SECRET_SCANNER_PATH": str(tmp_path),
+            "SECRET_SCANNER_EXCLUDE": "vendor",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert code == 1
 
 
 def test_argv_jobs_is_opt_in() -> None:

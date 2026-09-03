@@ -77,6 +77,34 @@ def _min_confidence_from_env(env: Mapping[str, str]) -> int | None:
     return value
 
 
+def _exclude_names_from_env(env: Mapping[str, str]) -> list[str]:
+    """Parse directory names (comma or newline separated). Empty means omit."""
+    raw = env.get("SECRET_SCANNER_EXCLUDE", "")
+    if not raw.strip():
+        return []
+    names: list[str] = []
+    normalized = raw.replace("\r\n", "\n").replace("\r", "\n")
+    for line in normalized.split("\n"):
+        for piece in line.split(","):
+            name = piece.strip()
+            if not name:
+                continue
+            if name.startswith("-"):
+                raise ActionConfigError("exclude must not look like a CLI flag")
+            if "/" in name or "\\" in name:
+                raise ActionConfigError("exclude must be a directory name, not a path")
+            if name in {".", ".."}:
+                raise ActionConfigError("exclude must be a directory name")
+            if len(name) > _MAX_PATTERN_NAME:
+                raise ActionConfigError("exclude name is too long")
+            names.append(name)
+    if len(names) > MAX_SKIP_PATTERNS:
+        raise ActionConfigError(
+            f"at most {MAX_SKIP_PATTERNS} exclude names are allowed"
+        )
+    return names
+
+
 def _jobs_from_env(env: Mapping[str, str]) -> int | None:
     """Parse jobs. Empty/missing means omit (CLI default 1). 0 means auto."""
     raw = env.get("SECRET_SCANNER_JOBS", "")
@@ -215,6 +243,8 @@ def argv_from_env(env: Mapping[str, str]) -> list[str]:
         env, "SECRET_SCANNER_SKIP_GLOB", label="skip-glob"
     ):
         argv.extend(["--skip-glob", pattern])
+    for name in _exclude_names_from_env(env):
+        argv.extend(["--exclude", name])
     if hidden:
         argv.append("--include-hidden")
     if _flag_from_env(env, "SECRET_SCANNER_QUIET", label="quiet"):

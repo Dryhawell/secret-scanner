@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.36.0 — 2026-09-03
+
+### Added
+
+- GitHub Action input `exclude` (directory names, not globs; comma or newline separated; via env, not the shell)
+- Flag-like names and path separators are rejected so they cannot become extra CLI flags
+
 ## 1.35.0 — 2026-09-03
 
 ### Added

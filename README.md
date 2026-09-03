@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.35.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.36.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.35.0
+# Secret Scanner 1.36.0
 ```
 
 ## Why Secret Scanner?
@@ -40,7 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
-- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.35.0`)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.36.0`)
 - `--jobs` worker threads for file scans (default 1)
 - GitHub Action input `jobs` (empty = CLI default 1; `0` = CPU count)
 - Localhost HTML dashboard (`--dashboard`)
@@ -59,6 +59,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - GitHub Action input `skip-pattern` (comma or newline separated names)
 - GitHub Action input `only-pattern` (allowlist; applied before skip-pattern)
 - GitHub Action inputs `glob` / `skip-glob` (comma or newline separated)
+- GitHub Action input `exclude` (directory names, not globs)
 - `--max-file-size N` (mebibytes; `0` = unlimited)
 - GitHub Action input `max-file-size` (empty = CLI default 5 MiB)
 - Oversized-file skip count in the scan summary
@@ -564,7 +565,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.35.0
+      - uses: Dryhawell/secret-scanner@v1.36.0
         with:
           include-hidden: true
           fail-on-severity: HIGH
@@ -572,6 +573,7 @@ jobs:
           min-confidence: 80
           skip-pattern: Contextual Secret
           glob: "*.py"
+          exclude: vendor, dist
           jobs: 4
 ```
 
@@ -589,7 +591,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.35.0
+      - uses: Dryhawell/secret-scanner@v1.36.0
         with:
           include-hidden: true
           sarif: true
@@ -601,7 +603,9 @@ Inputs: `path` (default `.`), `include-hidden`, `severity`,
 (empty = CLI default 0; 0–99), `skip-pattern` (comma or newline separated
 names; empty = none), `only-pattern` (allowlist; empty = all rules;
 applied before `skip-pattern`), `glob` / `skip-glob` (comma or newline
-separated `fnmatch` patterns; empty = no extra file filter), `jobs`
+separated `fnmatch` patterns; empty = no extra file filter), `exclude`
+(directory names to skip in addition to defaults; comma or newline
+separated; empty = none), `jobs`
 (empty = CLI default 1; `0` = CPU count; max 32), `python-version`,
 `quiet` (default false; keep false so masked findings stay in the job log),
 `sarif` (default false), `sarif-file` (default `secret-scanner.sarif`,
@@ -641,7 +645,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, `--max-file-size`, oversized skip counts, binary skip counts, GitHub Action SARIF upload, `--fail-on-severity`, GitHub Action `max-file-size`, GitHub Action `min-confidence`, GitHub Action `skip-pattern`, GitHub Action `only-pattern`, GitHub Action `glob` / `skip-glob`, GitHub Action `jobs`, parallel file scans, the localhost dashboard, the hook
+and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, `--max-file-size`, oversized skip counts, binary skip counts, GitHub Action SARIF upload, `--fail-on-severity`, GitHub Action `max-file-size`, GitHub Action `min-confidence`, GitHub Action `skip-pattern`, GitHub Action `only-pattern`, GitHub Action `glob` / `skip-glob`, GitHub Action `jobs`, GitHub Action `exclude`, parallel file scans, the localhost dashboard, the hook
 installer, project config files, custom patterns, SARIF and HTML reports, and
 the CI workflow file. All credentials in tests are fakes.
 
@@ -671,9 +675,10 @@ the CI workflow file. All credentials in tests are fakes.
   relative to the scan root; `*` there can match across directories.
   Excluded directories (`node_modules`, `--exclude dist`) are never
   walked, so a glob cannot re-include them. The Action inputs use the
-  same rules (comma or newline separated; quote `*.py` in YAML so it is
-  not a YAML alias). A tight `glob` is a false-negative window: files
-  that do not match are never scanned.
+  same glob rules (comma or newline separated; quote `*.py` in YAML so it
+  is not a YAML alias). The Action `exclude` input is a directory-name
+  list, not a path or glob. A tight `glob` is a false-negative window:
+  files that do not match are never scanned.
 - `--staged` does not scan untracked files; `--changed` does not equal
   “the whole repository”. `--since REF` only lists `REF...HEAD`; a leak
   that already sat on the base branch and was not edited is skipped.
@@ -724,7 +729,7 @@ the CI workflow file. All credentials in tests are fakes.
 ```text
 main.py                 entry point (exit code from cli)
 cli/interface.py        argparse, text/JSON output, Git flags, --stdin, --quiet, --min-confidence, --fail-on-severity, --list-patterns, --only-pattern, --max-file-size
-cli/github_action.py    composite-action argv (env → CLI, --no-color, optional SARIF, fail-on-severity, max-file-size, min-confidence, skip-pattern, only-pattern, glob, skip-glob, jobs)
+cli/github_action.py    composite-action argv (env → CLI, --no-color, optional SARIF, fail-on-severity, max-file-size, min-confidence, skip-pattern, only-pattern, glob, skip-glob, exclude, jobs)
 cli/dashboard.py        localhost HTML dashboard (127.0.0.1)
 scanner/
   file_handler.py       discovery, excludes, globs, binary/size caps, skip counts
