@@ -249,6 +249,8 @@ def argv_from_env(env: Mapping[str, str]) -> list[str]:
         argv.append("--include-hidden")
     if _flag_from_env(env, "SECRET_SCANNER_QUIET", label="quiet"):
         argv.append("--quiet")
+    if _flag_from_env(env, "SECRET_SCANNER_VERBOSE", label="verbose"):
+        argv.append("--verbose")
     if _flag_from_env(env, "SECRET_SCANNER_SARIF", label="sarif"):
         sarif_file = relative_sarif_path(
             env.get("SECRET_SCANNER_SARIF_FILE", _DEFAULT_SARIF_FILE)

@@ -62,6 +62,10 @@ inputs:
     description: Suppress the text report (exit code still 1 on findings)
     required: false
     default: "false"
+  verbose:
+    description: Write DEBUG per-file lines to the log file (secrets stay unlogged)
+    required: false
+    default: "false"
   sarif:
     description: Write SARIF and upload to GitHub code scanning (needs security-events: write)
     required: false
@@ -96,6 +100,7 @@ runs:
         SECRET_SCANNER_EXCLUDE: ${{ inputs.exclude }}
         SECRET_SCANNER_JOBS: ${{ inputs.jobs }}
         SECRET_SCANNER_QUIET: ${{ inputs.quiet }}
+        SECRET_SCANNER_VERBOSE: ${{ inputs.verbose }}
         SECRET_SCANNER_SARIF: ${{ inputs.sarif }}
         SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}
       run: python "$SECRET_SCANNER_ROOT/cli/github_action.py"

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.38.0 — 2026-09-03
+
+### Added
+
+- GitHub Action input `verbose` (DEBUG per-file lines in the log file; via env, not the shell)
+- Does not change the exit code and still never logs plaintext secrets
+
 ## 1.37.0 — 2026-09-03
 
 ### Added

@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.37.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.38.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.37.0
+# Secret Scanner 1.38.0
 ```
 
 ## Why Secret Scanner?
@@ -40,7 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
-- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.37.0`)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.38.0`)
 - `--jobs` worker threads for file scans (default 1)
 - GitHub Action input `jobs` (empty = CLI default 1; `0` = CPU count)
 - Localhost HTML dashboard (`--dashboard`)
@@ -52,6 +52,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - File logging without secret values
 - Exit codes for CI (`0` clean, `1` findings, `2` error)
 - `--quiet` / `-q` (text report off; exit code unchanged)
+- GitHub Action input `verbose` (DEBUG per-file lines in the log file)
 - `--min-confidence` report filter (not a detector change)
 - GitHub Action input `min-confidence` (empty = CLI default 0)
 - `--fail-on-severity` CI exit gate (default: same as `--severity`)
@@ -570,7 +571,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.37.0
+      - uses: Dryhawell/secret-scanner@v1.38.0
         with:
           include-hidden: true
           fail-on-severity: HIGH
@@ -596,7 +597,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.37.0
+      - uses: Dryhawell/secret-scanner@v1.38.0
         with:
           include-hidden: true
           sarif: true
@@ -613,6 +614,8 @@ separated `fnmatch` patterns; empty = no extra file filter), `exclude`
 separated; empty = none), `jobs`
 (empty = CLI default 1; `0` = CPU count; max 32), `python-version`,
 `quiet` (default false; keep false so masked findings stay in the job log),
+`verbose` (default false; DEBUG per-file lines in `logs/secret_scanner.log`,
+not the job log),
 `sarif` (default false), `sarif-file` (default `secret-scanner.sarif`,
 workspace-relative only). The action always passes `--no-color` (Actions logs).
 It does not run `--dashboard`, `--update-baseline`, `--stdin`, or Git scan
@@ -650,7 +653,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, `--max-file-size`, oversized skip counts, binary skip counts, GitHub Action SARIF upload, `--fail-on-severity`, GitHub Action `max-file-size`, GitHub Action `min-confidence`, GitHub Action `skip-pattern`, GitHub Action `only-pattern`, GitHub Action `glob` / `skip-glob`, GitHub Action `jobs`, GitHub Action `exclude`, parallel file scans, the localhost dashboard, the hook
+and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, `--max-file-size`, oversized skip counts, binary skip counts, GitHub Action SARIF upload, `--fail-on-severity`, GitHub Action `max-file-size`, GitHub Action `min-confidence`, GitHub Action `skip-pattern`, GitHub Action `only-pattern`, GitHub Action `glob` / `skip-glob`, GitHub Action `jobs`, GitHub Action `exclude`, GitHub Action `verbose`, parallel file scans, the localhost dashboard, the hook
 installer, project config files, custom patterns, SARIF and HTML reports, and
 the CI workflow file. All credentials in tests are fakes.
 
@@ -709,6 +712,10 @@ the CI workflow file. All credentials in tests are fakes.
   Git history. Binding is loopback-only; do not publish the port.
 - `--quiet` hides finding locations from the terminal. The exit code still
   fails the job; use JSON/SARIF or omit `--quiet` when triaging.
+- `--verbose` writes DEBUG per-file lines to the log file. It does not print
+  plaintext secrets and does not change the exit code. The Action input is
+  the same knob (default false). Combined with `quiet`, the job log stays
+  silent while the log file still records paths.
 - `--min-confidence` is a report filter. Raising it hides contextual noise
   and can also hide format-locked vendor hits whose score is below the floor.
 - `--fail-on-severity` is an exit policy, not a detector change. Findings
@@ -734,7 +741,7 @@ the CI workflow file. All credentials in tests are fakes.
 ```text
 main.py                 entry point (exit code from cli)
 cli/interface.py        argparse, text/JSON output, Git flags, --stdin, --quiet, --min-confidence, --fail-on-severity, --list-patterns, --only-pattern, --max-file-size
-cli/github_action.py    composite-action argv (env → CLI, --no-color, optional SARIF, fail-on-severity, max-file-size, min-confidence, skip-pattern, only-pattern, glob, skip-glob, exclude, jobs)
+cli/github_action.py    composite-action argv (env → CLI, --no-color, optional SARIF, fail-on-severity, max-file-size, min-confidence, skip-pattern, only-pattern, glob, skip-glob, exclude, jobs, verbose)
 cli/dashboard.py        localhost HTML dashboard (127.0.0.1)
 scanner/
   file_handler.py       discovery, excludes, globs, binary/size caps, skip counts

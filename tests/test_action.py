@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import pytest
@@ -34,6 +35,7 @@ def test_action_yml_is_composite_and_masks_in_logs() -> None:
     assert "SECRET_SCANNER_EXCLUDE: ${{ inputs.exclude }}" in text
     assert "SECRET_SCANNER_JOBS: ${{ inputs.jobs }}" in text
     assert "SECRET_SCANNER_QUIET: ${{ inputs.quiet }}" in text
+    assert "SECRET_SCANNER_VERBOSE: ${{ inputs.verbose }}" in text
     assert "SECRET_SCANNER_SARIF: ${{ inputs.sarif }}" in text
     assert "SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}" in text
     assert "github/codeql-action/upload-sarif@v3" in text
@@ -66,6 +68,7 @@ def test_action_run_line_does_not_interpolate_path_into_shell() -> None:
     assert "${{ inputs.jobs }}" not in run_line
     assert "${{ inputs.include-hidden }}" not in run_line
     assert "${{ inputs.quiet }}" not in run_line
+    assert "${{ inputs.verbose }}" not in run_line
     assert "${{ inputs.sarif }}" not in run_line
     assert "${{ inputs.sarif-file }}" not in run_line
 
@@ -103,6 +106,18 @@ def test_argv_quiet_is_opt_in() -> None:
     argv = argv_from_env({"SECRET_SCANNER_PATH": ".", "SECRET_SCANNER_QUIET": "true"})
     assert "--quiet" in argv
     assert "--quiet" not in argv_from_env({"SECRET_SCANNER_PATH": "."})
+
+
+def test_argv_verbose_is_opt_in() -> None:
+    argv = argv_from_env(
+        {"SECRET_SCANNER_PATH": ".", "SECRET_SCANNER_VERBOSE": "true"}
+    )
+    assert "--verbose" in argv
+    assert "--verbose" not in argv_from_env({"SECRET_SCANNER_PATH": "."})
+    empty = argv_from_env(
+        {"SECRET_SCANNER_PATH": ".", "SECRET_SCANNER_VERBOSE": "false"}
+    )
+    assert "--verbose" not in empty
 
 
 def test_argv_sarif_is_opt_in() -> None:
@@ -157,6 +172,11 @@ def test_argv_rejects_unsafe_sarif_file() -> None:
 def test_argv_rejects_unknown_quiet() -> None:
     with pytest.raises(ActionConfigError):
         argv_from_env({"SECRET_SCANNER_QUIET": "maybe"})
+
+
+def test_argv_rejects_unknown_verbose() -> None:
+    with pytest.raises(ActionConfigError, match="verbose"):
+        argv_from_env({"SECRET_SCANNER_VERBOSE": "maybe"})
 
 
 def test_argv_rejects_flag_like_path() -> None:
@@ -850,6 +870,40 @@ def test_action_clean_tree_exits_zero(tmp_path: Path) -> None:
         log_file=tmp_path / "scan.log",
     )
     assert code == 0
+
+
+def test_action_verbose_logs_path_not_secret(tmp_path: Path) -> None:
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    (tmp_path / "config.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'\n",
+        encoding="utf-8",
+    )
+    verbose_log = tmp_path / "verbose.log"
+    code = main(
+        {
+            "SECRET_SCANNER_PATH": str(tmp_path),
+            "SECRET_SCANNER_VERBOSE": "true",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=verbose_log,
+    )
+    for handler in logging.getLogger("secret_scanner").handlers:
+        handler.flush()
+    text = verbose_log.read_text(encoding="utf-8")
+    assert code == 1
+    assert "Scanning file" in text
+    assert aws not in text
+    quiet_log = tmp_path / "info.log"
+    main(
+        {
+            "SECRET_SCANNER_PATH": str(tmp_path),
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=quiet_log,
+    )
+    for handler in logging.getLogger("secret_scanner").handlers:
+        handler.flush()
+    assert "Scanning file" not in quiet_log.read_text(encoding="utf-8")
 
 
 def test_action_finding_exits_one_and_masks(
