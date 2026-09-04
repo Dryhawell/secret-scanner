@@ -30,8 +30,20 @@ from scanner.file_handler import (
 _SEVERITIES = frozenset({"LOW", "MEDIUM", "HIGH", "CRITICAL"})
 _HIDDEN_TRUE = frozenset({"true", "1", "yes"})
 _HIDDEN_FALSE = frozenset({"false", "0", "no", ""})
+_FILE_FORMATS = frozenset({"json", "html", "sarif"})
+_ALL_FORMATS = _FILE_FORMATS | {"text"}
+_DEFAULT_OUTPUT = {
+    "json": "secret-scanner.json",
+    "html": "secret-scanner.html",
+    "sarif": "secret-scanner.sarif",
+}
+_FORMAT_SUFFIX = {
+    "json": ".json",
+    "html": ".html",
+    "sarif": ".sarif",
+}
 _DEFAULT_SARIF_FILE = "secret-scanner.sarif"
-_MAX_SARIF_PATH = 256
+_MAX_REPORT_PATH = 256
 _MAX_PATTERN_NAME = 128
 
 
@@ -178,23 +190,60 @@ def _flag_from_env(env: Mapping[str, str], key: str, *, label: str) -> bool:
     return raw in _HIDDEN_TRUE
 
 
-def relative_sarif_path(raw: str) -> str:
-    """Return a workspace-relative ``*.sarif`` path, or raise ActionConfigError."""
+def _relative_report_path(raw: str, *, suffix: str, label: str) -> str:
+    """Return a workspace-relative report path, or raise ActionConfigError."""
     text = raw.strip()
     if not text or "\n" in raw or "\r" in raw:
-        raise ActionConfigError("sarif-file must be a single non-empty line")
-    if len(text) > _MAX_SARIF_PATH:
-        raise ActionConfigError("sarif-file path is too long")
+        raise ActionConfigError(f"{label} must be a single non-empty line")
+    if len(text) > _MAX_REPORT_PATH:
+        raise ActionConfigError(f"{label} path is too long")
     if text.startswith("-"):
-        raise ActionConfigError("sarif-file must not look like a CLI flag")
+        raise ActionConfigError(f"{label} must not look like a CLI flag")
     path = Path(text)
     if path.is_absolute() or bool(path.anchor):
-        raise ActionConfigError("sarif-file must be a relative path")
+        raise ActionConfigError(f"{label} must be a relative path")
     if any(part == ".." for part in path.parts):
-        raise ActionConfigError("sarif-file must not contain ..")
-    if path.suffix.casefold() != ".sarif":
-        raise ActionConfigError("sarif-file must end with .sarif")
+        raise ActionConfigError(f"{label} must not contain ..")
+    if path.suffix.casefold() != suffix:
+        raise ActionConfigError(f"{label} must end with {suffix}")
     return path.as_posix()
+
+
+def relative_sarif_path(raw: str) -> str:
+    """Return a workspace-relative ``*.sarif`` path, or raise ActionConfigError."""
+    return _relative_report_path(raw, suffix=".sarif", label="sarif-file")
+
+
+def _format_from_env(env: Mapping[str, str]) -> str | None:
+    """Parse format. Empty or text means omit (CLI default: text report)."""
+    raw = env.get("SECRET_SCANNER_FORMAT", "")
+    text = raw.strip().casefold()
+    if not text:
+        return None
+    if "\n" in raw or "\r" in raw:
+        raise ActionConfigError("format must be a single line")
+    if text not in _ALL_FORMATS:
+        raise ActionConfigError("format must be text, json, html, or sarif")
+    if text == "text":
+        return None
+    return text
+
+
+def _output_for_format(env: Mapping[str, str], format_name: str | None) -> str | None:
+    """Pair a file format with a relative --output path."""
+    raw = env.get("SECRET_SCANNER_OUTPUT", "")
+    text = raw.strip()
+    if not text:
+        if format_name is None:
+            return None
+        return _DEFAULT_OUTPUT[format_name]
+    if format_name is None:
+        raise ActionConfigError("output requires format (json, html, or sarif)")
+    if text == "-":
+        raise ActionConfigError("output must be a file path, not stdout")
+    return _relative_report_path(
+        raw, suffix=_FORMAT_SUFFIX[format_name], label="output"
+    )
 
 
 def argv_from_env(env: Mapping[str, str]) -> list[str]:
@@ -251,6 +300,10 @@ def argv_from_env(env: Mapping[str, str]) -> list[str]:
         argv.append("--quiet")
     if _flag_from_env(env, "SECRET_SCANNER_VERBOSE", label="verbose"):
         argv.append("--verbose")
+    format_name = _format_from_env(env)
+    output_path = _output_for_format(env, format_name)
+    if format_name is not None:
+        argv.extend(["--format", format_name, "--output", output_path])
     if _flag_from_env(env, "SECRET_SCANNER_SARIF", label="sarif"):
         sarif_file = relative_sarif_path(
             env.get("SECRET_SCANNER_SARIF_FILE", _DEFAULT_SARIF_FILE)

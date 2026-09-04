@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.40.0 — 2026-09-04
+
+### Added
+
+- GitHub Action inputs `format` and `output` (json/html/sarif write a workspace-relative file; empty format keeps the text job log)
+- `output` without `format` is rejected so a lone path cannot silently switch the CLI to JSON
+
 ## 1.39.0 — 2026-09-04
 
 ### Added

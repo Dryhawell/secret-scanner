@@ -66,6 +66,14 @@ inputs:
     description: Write DEBUG per-file lines to the log file (secrets stay unlogged)
     required: false
     default: "false"
+  format:
+    description: Report format (empty or text = job-log text; json/html/sarif write a file)
+    required: false
+    default: ""
+  output:
+    description: Workspace-relative report path (only with format json/html/sarif)
+    required: false
+    default: ""
   sarif:
     description: Write SARIF and upload to GitHub code scanning (needs security-events: write)
     required: false
@@ -101,6 +109,8 @@ runs:
         SECRET_SCANNER_JOBS: ${{ inputs.jobs }}
         SECRET_SCANNER_QUIET: ${{ inputs.quiet }}
         SECRET_SCANNER_VERBOSE: ${{ inputs.verbose }}
+        SECRET_SCANNER_FORMAT: ${{ inputs.format }}
+        SECRET_SCANNER_OUTPUT: ${{ inputs.output }}
         SECRET_SCANNER_SARIF: ${{ inputs.sarif }}
         SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}
       run: python "$SECRET_SCANNER_ROOT/cli/github_action.py"

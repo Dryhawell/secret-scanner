@@ -36,6 +36,8 @@ def test_action_yml_is_composite_and_masks_in_logs() -> None:
     assert "SECRET_SCANNER_JOBS: ${{ inputs.jobs }}" in text
     assert "SECRET_SCANNER_QUIET: ${{ inputs.quiet }}" in text
     assert "SECRET_SCANNER_VERBOSE: ${{ inputs.verbose }}" in text
+    assert "SECRET_SCANNER_FORMAT: ${{ inputs.format }}" in text
+    assert "SECRET_SCANNER_OUTPUT: ${{ inputs.output }}" in text
     assert "SECRET_SCANNER_SARIF: ${{ inputs.sarif }}" in text
     assert "SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}" in text
     assert "github/codeql-action/upload-sarif@v3" in text
@@ -69,6 +71,8 @@ def test_action_run_line_does_not_interpolate_path_into_shell() -> None:
     assert "${{ inputs.include-hidden }}" not in run_line
     assert "${{ inputs.quiet }}" not in run_line
     assert "${{ inputs.verbose }}" not in run_line
+    assert "${{ inputs.format }}" not in run_line
+    assert "${{ inputs.output }}" not in run_line
     assert "${{ inputs.sarif }}" not in run_line
     assert "${{ inputs.sarif-file }}" not in run_line
 
@@ -167,6 +171,98 @@ def test_argv_rejects_unsafe_sarif_file() -> None:
         )
     with pytest.raises(ActionConfigError):
         argv_from_env({"SECRET_SCANNER_SARIF": "maybe"})
+
+
+def test_argv_format_is_opt_in() -> None:
+    argv = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_FORMAT": "json",
+        }
+    )
+    assert argv[argv.index("--format") + 1] == "json"
+    assert argv[argv.index("--output") + 1] == "secret-scanner.json"
+    without = argv_from_env({"SECRET_SCANNER_PATH": "."})
+    assert "--format" not in without
+    assert "--output" not in without
+    text = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_FORMAT": "text",
+        }
+    )
+    assert "--format" not in text
+    assert "--output" not in text
+
+
+def test_argv_format_custom_output() -> None:
+    argv = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_FORMAT": "html",
+            "SECRET_SCANNER_OUTPUT": "reports/scan.html",
+        }
+    )
+    assert argv[argv.index("--format") + 1] == "html"
+    assert argv[argv.index("--output") + 1] == "reports/scan.html"
+
+
+def test_argv_rejects_output_without_format() -> None:
+    with pytest.raises(ActionConfigError, match="output requires format"):
+        argv_from_env({"SECRET_SCANNER_OUTPUT": "secret-scanner.json"})
+
+
+def test_argv_rejects_invalid_format_and_output() -> None:
+    with pytest.raises(ActionConfigError, match="format"):
+        argv_from_env({"SECRET_SCANNER_FORMAT": "xml"})
+    with pytest.raises(ActionConfigError, match="output"):
+        argv_from_env(
+            {
+                "SECRET_SCANNER_FORMAT": "json",
+                "SECRET_SCANNER_OUTPUT": "-",
+            }
+        )
+    with pytest.raises(ActionConfigError, match="output"):
+        argv_from_env(
+            {
+                "SECRET_SCANNER_FORMAT": "json",
+                "SECRET_SCANNER_OUTPUT": "../out.json",
+            }
+        )
+    with pytest.raises(ActionConfigError, match="output"):
+        argv_from_env(
+            {
+                "SECRET_SCANNER_FORMAT": "json",
+                "SECRET_SCANNER_OUTPUT": "out.html",
+            }
+        )
+    assert main({"SECRET_SCANNER_FORMAT": "xml"}) == 2
+
+
+def test_action_format_json_writes_masked_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    (tmp_path / "config.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'\n",
+        encoding="utf-8",
+    )
+    code = main(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_FORMAT": "json",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    report = tmp_path / "secret-scanner.json"
+    text = report.read_text(encoding="utf-8")
+    assert code == 1
+    assert report.is_file()
+    assert aws not in text
+    assert "AWS Access Key ID" in text
+    assert "masked_value" in text
 
 
 def test_argv_rejects_unknown_quiet() -> None:
