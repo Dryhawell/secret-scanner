@@ -67,6 +67,10 @@ PATTERN_SEVERITY: dict[str, Severity] = {
     "Netlify Token": Severity.HIGH,
     "New Relic Key": Severity.HIGH,
     "Sentry Token": Severity.HIGH,
+    "Vault Token": Severity.HIGH,
+    "Heroku Token": Severity.HIGH,
+    "Airtable Token": Severity.HIGH,
+    "Doppler Token": Severity.HIGH,
     # MEDIUM: likely credentials, but often placeholders or local secrets.
     "Generic Password": Severity.MEDIUM,
     # MEDIUM: variable name is sensitive, value has no known vendor format.

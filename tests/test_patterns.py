@@ -376,6 +376,47 @@ def test_sentry_token_matches_user_and_org() -> None:
     assert "Sentry Token" not in _match_names("sntrys_" + "notjson_" + ("C" * 43))
 
 
+def test_vault_token_is_not_legacy_s_dot() -> None:
+    service = "hvs." + ("A" * 24)
+    names = _match_names(service)
+    assert "Vault Token" in names
+    assert "Hugging Face Token" not in names
+    assert "Vault Token" in _match_names("hvb." + ("B" * 24))
+    assert "Vault Token" not in _match_names("hvs." + "short")
+    assert "Vault Token" not in _match_names("s." + ("C" * 24))
+
+
+def test_heroku_token_is_not_bare_uuid() -> None:
+    fake = "HRKU-" + ("D" * 58)
+    names = _match_names(fake)
+    assert "Heroku Token" in names
+    uuid = "12345678-1234-1234-1234-1234567890ab"
+    assert "Heroku Token" not in _match_names(uuid)
+    assert "Heroku Token" not in _match_names("HRKU-" + "short")
+
+
+def test_airtable_token_matches_pat_shape() -> None:
+    fake = "pat" + ("E" * 14) + "." + ("a" * 64)
+    names = _match_names(fake)
+    assert "Airtable Token" in names
+    assert "Airtable Token" not in _match_names("pat" + "short")
+    assert "Airtable Token" not in _match_names("pat" + ("E" * 14))
+
+
+def test_doppler_token_is_not_digitalocean() -> None:
+    personal = "dp.pt." + ("F" * 43)
+    names = _match_names(personal)
+    assert "Doppler Token" in names
+    assert "DigitalOcean Token" not in names
+    service = "dp.st.dev." + ("G" * 43)
+    assert "Doppler Token" in _match_names(service)
+    ocean = "dop_v1_" + ("a" * 64)
+    names = _match_names(ocean)
+    assert "DigitalOcean Token" in names
+    assert "Doppler Token" not in names
+    assert "Doppler Token" not in _match_names("dp.pt." + "short")
+
+
 def test_default_catalog_is_non_empty_and_named() -> None:
     patterns = default_patterns()
     names = [pattern.name for pattern in patterns]
@@ -400,3 +441,7 @@ def test_default_catalog_is_non_empty_and_named() -> None:
     assert "Netlify Token" in names
     assert "New Relic Key" in names
     assert "Sentry Token" in names
+    assert "Vault Token" in names
+    assert "Heroku Token" in names
+    assert "Airtable Token" in names
+    assert "Doppler Token" in names

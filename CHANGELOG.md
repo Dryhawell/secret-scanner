@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.41.0 — 2026-09-04
+
+### Added
+
+- Built-in formats: HashiCorp Vault (`hvs.` / `hvb.`), Heroku (`HRKU-`),
+  Airtable PATs (`pat`), Doppler (`dp.pt.` / `dp.st.` / …)
+
 ## 1.40.0 — 2026-09-04
 
 ### Added

@@ -57,6 +57,10 @@ FORMAT_LOCKED_PATTERNS: frozenset[str] = frozenset(
         "Netlify Token",
         "New Relic Key",
         "Sentry Token",
+        "Vault Token",
+        "Heroku Token",
+        "Airtable Token",
+        "Doppler Token",
     }
 )
 

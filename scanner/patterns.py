@@ -273,6 +273,33 @@ def default_patterns() -> list[SecretPattern]:
             severity=severity_for("Sentry Token"),
             description="Sentry user tokens use sntryu_; org tokens use sntrys_ plus a base64 payload.",
         ),
+        SecretPattern(
+            name="Vault Token",
+            regex=r"(?<![A-Za-z0-9])hv[sbr]\.[A-Za-z0-9_-]{24,}(?![A-Za-z0-9_-])",
+            severity=severity_for("Vault Token"),
+            description="HashiCorp Vault tokens start with hvs., hvb., or hvr. and a long base64url payload.",
+        ),
+        SecretPattern(
+            name="Heroku Token",
+            regex=r"(?<![A-Za-z0-9])HRKU-[A-Za-z0-9_-]{58,}(?![A-Za-z0-9_-])",
+            severity=severity_for("Heroku Token"),
+            description="Heroku OAuth access tokens start with HRKU- (not a bare UUID).",
+        ),
+        SecretPattern(
+            name="Airtable Token",
+            regex=r"(?<![A-Za-z0-9])pat[A-Za-z0-9]{14}\.[a-fA-F0-9]{64}(?![a-fA-F0-9])",
+            severity=severity_for("Airtable Token"),
+            description="Airtable personal access tokens look like pat, 14 id characters, a dot, then 64 hex.",
+        ),
+        SecretPattern(
+            name="Doppler Token",
+            regex=(
+                r"(?<![A-Za-z0-9])dp\.(?:(?:pt|ct|sa|said|scim|audit)"
+                r"|st(?:\.[a-z0-9_-]{2,35})?)\.[A-Za-z0-9]{40,44}(?![A-Za-z0-9])"
+            ),
+            severity=severity_for("Doppler Token"),
+            description="Doppler tokens use dp.pt., dp.st., dp.ct., and related prefixes.",
+        ),
     ]
 
 
