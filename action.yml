@@ -74,6 +74,14 @@ inputs:
     description: Workspace-relative report path (only with format json/html/sarif)
     required: false
     default: ""
+  config:
+    description: Workspace-relative JSON/YAML config (empty = auto-discover sidecar)
+    required: false
+    default: ""
+  ignore-file:
+    description: Workspace-relative allowlist file (empty = auto-discover sidecar)
+    required: false
+    default: ""
   sarif:
     description: Write SARIF and upload to GitHub code scanning (needs security-events: write)
     required: false
@@ -111,6 +119,8 @@ runs:
         SECRET_SCANNER_VERBOSE: ${{ inputs.verbose }}
         SECRET_SCANNER_FORMAT: ${{ inputs.format }}
         SECRET_SCANNER_OUTPUT: ${{ inputs.output }}
+        SECRET_SCANNER_CONFIG: ${{ inputs.config }}
+        SECRET_SCANNER_IGNORE_FILE: ${{ inputs.ignore-file }}
         SECRET_SCANNER_SARIF: ${{ inputs.sarif }}
         SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}
       run: python "$SECRET_SCANNER_ROOT/cli/github_action.py"

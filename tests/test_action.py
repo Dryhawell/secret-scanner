@@ -38,6 +38,8 @@ def test_action_yml_is_composite_and_masks_in_logs() -> None:
     assert "SECRET_SCANNER_VERBOSE: ${{ inputs.verbose }}" in text
     assert "SECRET_SCANNER_FORMAT: ${{ inputs.format }}" in text
     assert "SECRET_SCANNER_OUTPUT: ${{ inputs.output }}" in text
+    assert "SECRET_SCANNER_CONFIG: ${{ inputs.config }}" in text
+    assert "SECRET_SCANNER_IGNORE_FILE: ${{ inputs.ignore-file }}" in text
     assert "SECRET_SCANNER_SARIF: ${{ inputs.sarif }}" in text
     assert "SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}" in text
     assert "github/codeql-action/upload-sarif@v3" in text
@@ -73,6 +75,8 @@ def test_action_run_line_does_not_interpolate_path_into_shell() -> None:
     assert "${{ inputs.verbose }}" not in run_line
     assert "${{ inputs.format }}" not in run_line
     assert "${{ inputs.output }}" not in run_line
+    assert "${{ inputs.config }}" not in run_line
+    assert "${{ inputs.ignore-file }}" not in run_line
     assert "${{ inputs.sarif }}" not in run_line
     assert "${{ inputs.sarif-file }}" not in run_line
 
@@ -102,6 +106,7 @@ def test_argv_always_disables_color_and_never_adds_git_flags() -> None:
         "--history",
         "--since",
         "--stdin",
+        "--baseline",
     ):
         assert banned not in argv
 
@@ -263,6 +268,106 @@ def test_action_format_json_writes_masked_report(
     assert aws not in text
     assert "AWS Access Key ID" in text
     assert "masked_value" in text
+
+
+def test_argv_config_and_ignore_file_are_opt_in() -> None:
+    argv = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_CONFIG": "policy.json",
+            "SECRET_SCANNER_IGNORE_FILE": "allow.txt",
+        }
+    )
+    assert argv[argv.index("--config") + 1] == "policy.json"
+    assert argv[argv.index("--ignore-file") + 1] == "allow.txt"
+    without = argv_from_env({"SECRET_SCANNER_PATH": "."})
+    assert "--config" not in without
+    assert "--ignore-file" not in without
+    empty = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_CONFIG": "",
+            "SECRET_SCANNER_IGNORE_FILE": "",
+        }
+    )
+    assert "--config" not in empty
+    assert "--ignore-file" not in empty
+
+
+def test_argv_rejects_unsafe_config_and_ignore_file() -> None:
+    with pytest.raises(ActionConfigError, match="config"):
+        argv_from_env({"SECRET_SCANNER_CONFIG": "../policy.json"})
+    with pytest.raises(ActionConfigError, match="config"):
+        argv_from_env({"SECRET_SCANNER_CONFIG": "policy.txt"})
+    with pytest.raises(ActionConfigError, match="ignore-file"):
+        argv_from_env({"SECRET_SCANNER_IGNORE_FILE": "--update-baseline"})
+    yaml_ok = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_CONFIG": "policy.yml",
+        }
+    )
+    assert yaml_ok[yaml_ok.index("--config") + 1] == "policy.yml"
+
+
+def test_action_config_skips_contextual(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "auth.py").write_text(
+        'token = "LocalDevTokenValue1"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "policy.json").write_text(
+        '{"skip_patterns": ["Contextual Secret"]}\n',
+        encoding="utf-8",
+    )
+    skipped = main(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_CONFIG": "policy.json",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert skipped == 0
+    hit = main(
+        {
+            "SECRET_SCANNER_PATH": ".",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert hit == 1
+
+
+def test_action_ignore_file_allows_leaky_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    (tmp_path / "leaky.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "allow.txt").write_text("leaky.py\n", encoding="utf-8")
+    skipped = main(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_IGNORE_FILE": "allow.txt",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert skipped == 0
+    hit = main(
+        {
+            "SECRET_SCANNER_PATH": ".",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert hit == 1
 
 
 def test_argv_rejects_unknown_quiet() -> None:

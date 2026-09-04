@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.42.0 — 2026-09-04
+
+### Added
+
+- GitHub Action inputs `config` and `ignore-file` (workspace-relative; empty = CLI sidecar discovery)
+- Config paths must be `.json` / `.yml` / `.yaml`; `..` and flag-like names are rejected
+
 ## 1.41.0 — 2026-09-04
 
 ### Added

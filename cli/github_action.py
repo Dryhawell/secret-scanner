@@ -45,6 +45,7 @@ _FORMAT_SUFFIX = {
 _DEFAULT_SARIF_FILE = "secret-scanner.sarif"
 _MAX_REPORT_PATH = 256
 _MAX_PATTERN_NAME = 128
+_CONFIG_SUFFIXES = frozenset({".json", ".yml", ".yaml"})
 
 
 class ActionConfigError(ValueError):
@@ -190,8 +191,10 @@ def _flag_from_env(env: Mapping[str, str], key: str, *, label: str) -> bool:
     return raw in _HIDDEN_TRUE
 
 
-def _relative_report_path(raw: str, *, suffix: str, label: str) -> str:
-    """Return a workspace-relative report path, or raise ActionConfigError."""
+def _relative_workspace_path(
+    raw: str, *, label: str, suffixes: frozenset[str] | None = None
+) -> str:
+    """Return a workspace-relative path, or raise ActionConfigError."""
     text = raw.strip()
     if not text or "\n" in raw or "\r" in raw:
         raise ActionConfigError(f"{label} must be a single non-empty line")
@@ -204,14 +207,34 @@ def _relative_report_path(raw: str, *, suffix: str, label: str) -> str:
         raise ActionConfigError(f"{label} must be a relative path")
     if any(part == ".." for part in path.parts):
         raise ActionConfigError(f"{label} must not contain ..")
-    if path.suffix.casefold() != suffix:
-        raise ActionConfigError(f"{label} must end with {suffix}")
+    if suffixes is not None and path.suffix.casefold() not in suffixes:
+        allowed = " or ".join(sorted(suffixes))
+        raise ActionConfigError(f"{label} must end with {allowed}")
     return path.as_posix()
+
+
+def _relative_report_path(raw: str, *, suffix: str, label: str) -> str:
+    """Return a workspace-relative report path, or raise ActionConfigError."""
+    return _relative_workspace_path(raw, label=label, suffixes=frozenset({suffix}))
 
 
 def relative_sarif_path(raw: str) -> str:
     """Return a workspace-relative ``*.sarif`` path, or raise ActionConfigError."""
     return _relative_report_path(raw, suffix=".sarif", label="sarif-file")
+
+
+def _optional_path_from_env(
+    env: Mapping[str, str],
+    key: str,
+    *,
+    label: str,
+    suffixes: frozenset[str] | None = None,
+) -> str | None:
+    """Parse an optional relative path. Empty/missing means omit the flag."""
+    raw = env.get(key, "")
+    if not raw.strip():
+        return None
+    return _relative_workspace_path(raw, label=label, suffixes=suffixes)
 
 
 def _format_from_env(env: Mapping[str, str]) -> str | None:
@@ -304,6 +327,19 @@ def argv_from_env(env: Mapping[str, str]) -> list[str]:
     output_path = _output_for_format(env, format_name)
     if format_name is not None:
         argv.extend(["--format", format_name, "--output", output_path])
+    config_path = _optional_path_from_env(
+        env,
+        "SECRET_SCANNER_CONFIG",
+        label="config",
+        suffixes=_CONFIG_SUFFIXES,
+    )
+    if config_path is not None:
+        argv.extend(["--config", config_path])
+    ignore_path = _optional_path_from_env(
+        env, "SECRET_SCANNER_IGNORE_FILE", label="ignore-file"
+    )
+    if ignore_path is not None:
+        argv.extend(["--ignore-file", ignore_path])
     if _flag_from_env(env, "SECRET_SCANNER_SARIF", label="sarif"):
         sarif_file = relative_sarif_path(
             env.get("SECRET_SCANNER_SARIF_FILE", _DEFAULT_SARIF_FILE)
