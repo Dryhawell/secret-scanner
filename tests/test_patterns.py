@@ -329,6 +329,53 @@ def test_databricks_token_matches_fake_format() -> None:
     assert "Databricks Token" not in _match_names("dapi" + ("a" * 31))
 
 
+def test_notion_key_is_not_legacy_secret_prefix() -> None:
+    fake = "ntn_" + ("1" * 11) + ("A" * 35)
+    names = _match_names(fake)
+    assert "Notion API Key" in names
+    assert "npm Token" not in names
+    assert "Notion API Key" not in _match_names("ntn_" + "short")
+    assert "Notion API Key" not in _match_names("ntn_" + ("A" * 46))
+    assert "Notion API Key" not in _match_names("secret_" + ("B" * 43))
+
+
+def test_netlify_token_is_not_npm() -> None:
+    fake = "nfp_" + ("C" * 36)
+    names = _match_names(fake)
+    assert "Netlify Token" in names
+    assert "npm Token" not in names
+    assert "Netlify Token" in _match_names("nfc_" + ("D" * 36))
+    npm = "npm_" + ("A" * 36)
+    names = _match_names(npm)
+    assert "npm Token" in names
+    assert "Netlify Token" not in names
+    assert "Netlify Token" not in _match_names("nfp_" + "short")
+
+
+def test_new_relic_key_matches_user_and_ingest() -> None:
+    user = "NRAK-" + ("A" * 27)
+    ingest = "NRII-" + ("B" * 32)
+    names = _match_names(user)
+    assert "New Relic Key" in names
+    names = _match_names(ingest)
+    assert "New Relic Key" in names
+    assert "New Relic Key" not in _match_names("NRAK-" + "short")
+    assert "New Relic Key" not in _match_names("NRJS-" + ("a" * 19))
+
+
+def test_sentry_token_matches_user_and_org() -> None:
+    user = "sntryu_" + ("a" * 64)
+    org = "sntrys_" + "eyJ" + ("A" * 20) + "_" + ("B" * 43)
+    names = _match_names(user)
+    assert "Sentry Token" in names
+    assert "JWT" not in names
+    names = _match_names(org)
+    assert "Sentry Token" in names
+    assert "JWT" not in names
+    assert "Sentry Token" not in _match_names("sntryu_" + "short")
+    assert "Sentry Token" not in _match_names("sntrys_" + "notjson_" + ("C" * 43))
+
+
 def test_default_catalog_is_non_empty_and_named() -> None:
     patterns = default_patterns()
     names = [pattern.name for pattern in patterns]
@@ -349,3 +396,7 @@ def test_default_catalog_is_non_empty_and_named() -> None:
     assert "Grafana Token" in names
     assert "Square Token" in names
     assert "Databricks Token" in names
+    assert "Notion API Key" in names
+    assert "Netlify Token" in names
+    assert "New Relic Key" in names
+    assert "Sentry Token" in names

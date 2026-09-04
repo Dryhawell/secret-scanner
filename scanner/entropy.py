@@ -53,6 +53,10 @@ FORMAT_LOCKED_PATTERNS: frozenset[str] = frozenset(
         "Grafana Token",
         "Square Token",
         "Databricks Token",
+        "Notion API Key",
+        "Netlify Token",
+        "New Relic Key",
+        "Sentry Token",
     }
 )
 

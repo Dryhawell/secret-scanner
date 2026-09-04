@@ -63,6 +63,10 @@ PATTERN_SEVERITY: dict[str, Severity] = {
     "Grafana Token": Severity.HIGH,
     "Square Token": Severity.HIGH,
     "Databricks Token": Severity.HIGH,
+    "Notion API Key": Severity.HIGH,
+    "Netlify Token": Severity.HIGH,
+    "New Relic Key": Severity.HIGH,
+    "Sentry Token": Severity.HIGH,
     # MEDIUM: likely credentials, but often placeholders or local secrets.
     "Generic Password": Severity.MEDIUM,
     # MEDIUM: variable name is sensitive, value has no known vendor format.

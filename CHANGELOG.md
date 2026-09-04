@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.39.0 — 2026-09-04
+
+### Added
+
+- Built-in formats: Notion (`ntn_`), Netlify (`nfp_` / `nfc_` / …),
+  New Relic (`NRAK-` / `NRII-`), Sentry (`sntryu_` / `sntrys_`)
+
 ## 1.38.0 — 2026-09-03
 
 ### Added

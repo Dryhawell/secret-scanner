@@ -242,6 +242,37 @@ def default_patterns() -> list[SecretPattern]:
             severity=severity_for("Databricks Token"),
             description="Databricks personal access tokens start with dapi and 32 hex digits.",
         ),
+        SecretPattern(
+            name="Notion API Key",
+            regex=r"(?<![A-Za-z0-9])ntn_[0-9]{11}[A-Za-z0-9]{35}(?![A-Za-z0-9])",
+            severity=severity_for("Notion API Key"),
+            description="Notion integration tokens start with ntn_, 11 digits, then 35 alphanumeric characters.",
+        ),
+        SecretPattern(
+            name="Netlify Token",
+            regex=r"(?<![A-Za-z0-9])nf[pcoub]_[A-Za-z0-9]{36}(?![A-Za-z0-9])",
+            severity=severity_for("Netlify Token"),
+            description="Netlify tokens use nfp_, nfc_, nfo_, nfu_, or nfb_ plus 36 alphanumeric characters.",
+        ),
+        SecretPattern(
+            name="New Relic Key",
+            regex=(
+                r"(?<![A-Za-z0-9])(?:NRAK-[A-Za-z0-9]{27}"
+                r"|NRII-[A-Za-z0-9-]{32})(?![A-Za-z0-9-])"
+            ),
+            severity=severity_for("New Relic Key"),
+            description="New Relic user keys start with NRAK-; ingest keys start with NRII-.",
+        ),
+        SecretPattern(
+            name="Sentry Token",
+            regex=(
+                r"(?<![A-Za-z0-9])(?:sntryu_[a-fA-F0-9]{64}"
+                r"|sntrys_eyJ[A-Za-z0-9+/=]{8,}_[A-Za-z0-9+/]{43})"
+                r"(?![A-Za-z0-9+/=])"
+            ),
+            severity=severity_for("Sentry Token"),
+            description="Sentry user tokens use sntryu_; org tokens use sntrys_ plus a base64 payload.",
+        ),
     ]
 
 
