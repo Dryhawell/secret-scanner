@@ -8,8 +8,11 @@ from pathlib import Path
 import pytest
 
 from cli.github_action import ActionConfigError, argv_from_env, main
+from scanner.baseline import write_baseline
 from scanner.config_file import MAX_SKIP_PATTERNS
 from scanner.file_handler import MIB
+from scanner.ignore import ignore_root
+from scanner.scanner import Scanner
 
 ROOT = Path(__file__).resolve().parent.parent
 ACTION = ROOT / "action.yml"
@@ -40,6 +43,7 @@ def test_action_yml_is_composite_and_masks_in_logs() -> None:
     assert "SECRET_SCANNER_OUTPUT: ${{ inputs.output }}" in text
     assert "SECRET_SCANNER_CONFIG: ${{ inputs.config }}" in text
     assert "SECRET_SCANNER_IGNORE_FILE: ${{ inputs.ignore-file }}" in text
+    assert "SECRET_SCANNER_BASELINE: ${{ inputs.baseline }}" in text
     assert "SECRET_SCANNER_SARIF: ${{ inputs.sarif }}" in text
     assert "SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}" in text
     assert "github/codeql-action/upload-sarif@v3" in text
@@ -77,6 +81,7 @@ def test_action_run_line_does_not_interpolate_path_into_shell() -> None:
     assert "${{ inputs.output }}" not in run_line
     assert "${{ inputs.config }}" not in run_line
     assert "${{ inputs.ignore-file }}" not in run_line
+    assert "${{ inputs.baseline }}" not in run_line
     assert "${{ inputs.sarif }}" not in run_line
     assert "${{ inputs.sarif-file }}" not in run_line
 
@@ -106,9 +111,9 @@ def test_argv_always_disables_color_and_never_adds_git_flags() -> None:
         "--history",
         "--since",
         "--stdin",
-        "--baseline",
     ):
         assert banned not in argv
+    assert "--baseline" not in argv
 
 
 def test_argv_quiet_is_opt_in() -> None:
@@ -294,6 +299,44 @@ def test_argv_config_and_ignore_file_are_opt_in() -> None:
     assert "--ignore-file" not in empty
 
 
+def test_argv_baseline_is_opt_in_and_never_updates() -> None:
+    argv = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_BASELINE": "known.json",
+        }
+    )
+    assert argv[argv.index("--baseline") + 1] == "known.json"
+    assert "--update-baseline" not in argv
+    without = argv_from_env({"SECRET_SCANNER_PATH": "."})
+    assert "--baseline" not in without
+    empty = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_BASELINE": "",
+        }
+    )
+    assert "--baseline" not in empty
+    assert "--update-baseline" not in empty
+
+
+def test_argv_rejects_unsafe_baseline() -> None:
+    with pytest.raises(ActionConfigError, match="baseline"):
+        argv_from_env({"SECRET_SCANNER_BASELINE": "../known.json"})
+    with pytest.raises(ActionConfigError, match="baseline"):
+        argv_from_env({"SECRET_SCANNER_BASELINE": "--update-baseline"})
+    with pytest.raises(ActionConfigError, match="baseline"):
+        argv_from_env({"SECRET_SCANNER_BASELINE": "known.txt"})
+    nested = argv_from_env(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_BASELINE": "ci/known.json",
+        }
+    )
+    assert nested[nested.index("--baseline") + 1] == "ci/known.json"
+    assert "--update-baseline" not in nested
+
+
 def test_argv_rejects_unsafe_config_and_ignore_file() -> None:
     with pytest.raises(ActionConfigError, match="config"):
         argv_from_env({"SECRET_SCANNER_CONFIG": "../policy.json"})
@@ -368,6 +411,53 @@ def test_action_ignore_file_allows_leaky_path(
         log_file=tmp_path / "scan.log",
     )
     assert hit == 1
+
+
+def test_action_baseline_suppresses_known_finding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    aws = "AKIA" + "ABCDEFGHIJ012345"
+    (tmp_path / "leaky.py").write_text(
+        f"AWS_ACCESS_KEY_ID = '{aws}'\n",
+        encoding="utf-8",
+    )
+    result = Scanner().scan(tmp_path)
+    write_baseline(tmp_path / "known.json", result.findings, ignore_root(tmp_path))
+    skipped = main(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_BASELINE": "known.json",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert skipped == 0
+    hit = main(
+        {
+            "SECRET_SCANNER_PATH": ".",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert hit == 1
+    assert aws not in (tmp_path / "known.json").read_text(encoding="utf-8")
+
+
+def test_action_missing_baseline_exits_two(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "ok.py").write_text("print('ok')\n", encoding="utf-8")
+    code = main(
+        {
+            "SECRET_SCANNER_PATH": ".",
+            "SECRET_SCANNER_BASELINE": "missing.json",
+        },
+        reports_dir=tmp_path / "reports",
+        log_file=tmp_path / "scan.log",
+    )
+    assert code == 2
 
 
 def test_argv_rejects_unknown_quiet() -> None:

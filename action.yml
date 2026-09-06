@@ -82,6 +82,10 @@ inputs:
     description: Workspace-relative allowlist file (empty = auto-discover sidecar)
     required: false
     default: ""
+  baseline:
+    description: Workspace-relative hashed baseline JSON (empty = auto-discover sidecar; never writes)
+    required: false
+    default: ""
   sarif:
     description: Write SARIF and upload to GitHub code scanning (needs security-events: write)
     required: false
@@ -121,6 +125,7 @@ runs:
         SECRET_SCANNER_OUTPUT: ${{ inputs.output }}
         SECRET_SCANNER_CONFIG: ${{ inputs.config }}
         SECRET_SCANNER_IGNORE_FILE: ${{ inputs.ignore-file }}
+        SECRET_SCANNER_BASELINE: ${{ inputs.baseline }}
         SECRET_SCANNER_SARIF: ${{ inputs.sarif }}
         SECRET_SCANNER_SARIF_FILE: ${{ inputs.sarif-file }}
       run: python "$SECRET_SCANNER_ROOT/cli/github_action.py"

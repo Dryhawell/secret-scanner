@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.43.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.44.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.43.0
+# Secret Scanner 1.44.0
 ```
 
 ## Why Secret Scanner?
@@ -40,7 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
-- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.43.0`)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.44.0`)
 - `--jobs` worker threads for file scans (default 1)
 - GitHub Action input `jobs` (empty = CLI default 1; `0` = CPU count)
 - Localhost HTML dashboard (`--dashboard`)
@@ -55,6 +55,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - GitHub Action input `verbose` (DEBUG per-file lines in the log file)
 - GitHub Action inputs `format` / `output` (json/html/sarif file; empty = text job log)
 - GitHub Action inputs `config` / `ignore-file` (empty = auto-discover sidecar)
+- GitHub Action input `baseline` (read-only hashed JSON; empty = auto-discover sidecar)
 - `--min-confidence` report filter (not a detector change)
 - GitHub Action input `min-confidence` (empty = CLI default 0)
 - `--fail-on-severity` CI exit gate (default: same as `--severity`)
@@ -588,7 +589,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.43.0
+      - uses: Dryhawell/secret-scanner@v1.44.0
         with:
           include-hidden: true
           fail-on-severity: HIGH
@@ -614,7 +615,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.43.0
+      - uses: Dryhawell/secret-scanner@v1.44.0
         with:
           include-hidden: true
           sarif: true
@@ -639,6 +640,8 @@ path; empty with `format: json` defaults to `secret-scanner.json`; rejected
 without a file format),
 `config` / `ignore-file` (empty = auto-discover `.secret-scanner.json` /
 `.secret-scanner-ignore` next to the scan target; workspace-relative only),
+`baseline` (empty = auto-discover `.secret-scanner-baseline.json`;
+workspace-relative `.json` only; never `--update-baseline`),
 `sarif` (default false), `sarif-file` (default `secret-scanner.sarif`,
 workspace-relative only). The action always passes `--no-color` (Actions logs).
 It does not run `--dashboard`, `--update-baseline`, `--stdin`, or Git scan
@@ -676,7 +679,7 @@ python -m pytest
 
 The suite covers pattern matching, filters, context, confidence, entropy,
 CLI exit codes, JSON reports, logging (no secret payload), Git staged/changed
-and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, `--max-file-size`, oversized skip counts, binary skip counts, GitHub Action SARIF upload, `--fail-on-severity`, GitHub Action `max-file-size`, GitHub Action `min-confidence`, GitHub Action `skip-pattern`, GitHub Action `only-pattern`, GitHub Action `glob` / `skip-glob`, GitHub Action `jobs`, GitHub Action `exclude`, GitHub Action `verbose`, GitHub Action `format` / `output`, GitHub Action `config` / `ignore-file`, parallel file scans, the localhost dashboard, the hook
+and history modes, `--since` deltas, `--stdin`, the GitHub composite action, file globs, `--quiet`, `--min-confidence`, `--list-patterns` / `--skip-pattern` / `--only-pattern`, `--max-file-size`, oversized skip counts, binary skip counts, GitHub Action SARIF upload, `--fail-on-severity`, GitHub Action `max-file-size`, GitHub Action `min-confidence`, GitHub Action `skip-pattern`, GitHub Action `only-pattern`, GitHub Action `glob` / `skip-glob`, GitHub Action `jobs`, GitHub Action `exclude`, GitHub Action `verbose`, GitHub Action `format` / `output`, GitHub Action `config` / `ignore-file`, GitHub Action `baseline`, parallel file scans, the localhost dashboard, the hook
 installer, project config files, custom patterns, SARIF and HTML reports, and
 the CI workflow file. All credentials in tests are fakes.
 
@@ -762,15 +765,17 @@ the CI workflow file. All credentials in tests are fakes.
   `sarif: true` remains a sidecar plus upload. JSON/HTML/SARIF still mask
   values and omit source snippets. `output` is workspace-relative only.
   `config` / `ignore-file` are the same relative-path rules; empty keeps
-  sidecar auto-discovery. A PR can still ship a policy file that skips
-  rules — treat that as a review item, not a scanner bug.
+  sidecar auto-discovery. `baseline` is read-only hashed JSON (never
+  `--update-baseline`); empty keeps sidecar auto-discovery. A PR can still
+  ship a policy file that skips rules — treat that as a review item, not a
+  scanner bug.
 
 ## Architecture
 
 ```text
 main.py                 entry point (exit code from cli)
 cli/interface.py        argparse, text/JSON output, Git flags, --stdin, --quiet, --min-confidence, --fail-on-severity, --list-patterns, --only-pattern, --max-file-size
-cli/github_action.py    composite-action argv (env → CLI, --no-color, optional SARIF, fail-on-severity, max-file-size, min-confidence, skip-pattern, only-pattern, glob, skip-glob, exclude, jobs, verbose, format, output, config, ignore-file)
+cli/github_action.py    composite-action argv (env → CLI, --no-color, optional SARIF, fail-on-severity, max-file-size, min-confidence, skip-pattern, only-pattern, glob, skip-glob, exclude, jobs, verbose, format, output, config, ignore-file, baseline)
 cli/dashboard.py        localhost HTML dashboard (127.0.0.1)
 scanner/
   file_handler.py       discovery, excludes, globs, binary/size caps, skip counts

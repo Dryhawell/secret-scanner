@@ -46,6 +46,7 @@ _DEFAULT_SARIF_FILE = "secret-scanner.sarif"
 _MAX_REPORT_PATH = 256
 _MAX_PATTERN_NAME = 128
 _CONFIG_SUFFIXES = frozenset({".json", ".yml", ".yaml"})
+_BASELINE_SUFFIXES = frozenset({".json"})
 
 
 class ActionConfigError(ValueError):
@@ -340,6 +341,14 @@ def argv_from_env(env: Mapping[str, str]) -> list[str]:
     )
     if ignore_path is not None:
         argv.extend(["--ignore-file", ignore_path])
+    baseline_path = _optional_path_from_env(
+        env,
+        "SECRET_SCANNER_BASELINE",
+        label="baseline",
+        suffixes=_BASELINE_SUFFIXES,
+    )
+    if baseline_path is not None:
+        argv.extend(["--baseline", baseline_path])
     if _flag_from_env(env, "SECRET_SCANNER_SARIF", label="sarif"):
         sarif_file = relative_sarif_path(
             env.get("SECRET_SCANNER_SARIF_FILE", _DEFAULT_SARIF_FILE)

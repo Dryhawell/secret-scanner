@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.44.0 — 2026-09-06
+
+### Added
+
+- GitHub Action input `baseline` (workspace-relative hashed JSON; empty = CLI sidecar discovery)
+- Read-only: the action never passes `--update-baseline`
+
 ## 1.43.0 — 2026-09-06
 
 ### Added
