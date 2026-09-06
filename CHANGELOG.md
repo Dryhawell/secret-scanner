@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.43.0 — 2026-09-06
+
+### Added
+
+- Built-in formats: Pulumi (`pul-`), Supabase (`sb_secret_` / `sbp_`),
+  Fly.io (`fo1_` / `fm2_`), Atlassian (`ATATT3`)
+
 ## 1.42.0 — 2026-09-04
 
 ### Added

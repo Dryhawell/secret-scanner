@@ -61,6 +61,10 @@ FORMAT_LOCKED_PATTERNS: frozenset[str] = frozenset(
         "Heroku Token",
         "Airtable Token",
         "Doppler Token",
+        "Pulumi Token",
+        "Supabase Token",
+        "Fly.io Token",
+        "Atlassian Token",
     }
 )
 

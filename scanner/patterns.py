@@ -300,6 +300,37 @@ def default_patterns() -> list[SecretPattern]:
             severity=severity_for("Doppler Token"),
             description="Doppler tokens use dp.pt., dp.st., dp.ct., and related prefixes.",
         ),
+        SecretPattern(
+            name="Pulumi Token",
+            regex=r"(?<![A-Za-z0-9])pul-[a-fA-F0-9]{40}(?![a-fA-F0-9])",
+            severity=severity_for("Pulumi Token"),
+            description="Pulumi access tokens start with pul- followed by 40 hex digits.",
+        ),
+        SecretPattern(
+            name="Supabase Token",
+            regex=(
+                r"(?<![A-Za-z0-9])(?:sb_secret_[A-Za-z0-9_-]{31}"
+                r"|sbp_(?:v[0-9]_)?[a-fA-F0-9]{40})(?![A-Za-z0-9_-])"
+            ),
+            severity=severity_for("Supabase Token"),
+            description="Supabase secret keys use sb_secret_; personal access tokens use sbp_.",
+        ),
+        SecretPattern(
+            name="Fly.io Token",
+            regex=(
+                r"(?<![A-Za-z0-9])(?:fo1_[A-Za-z0-9_-]{43}"
+                r"|fm2_[A-Za-z0-9+/]{100,}={0,3}"
+                r"|fm1[ar]_[A-Za-z0-9+/]{100,}={0,3})(?![A-Za-z0-9+/=_-])"
+            ),
+            severity=severity_for("Fly.io Token"),
+            description="Fly.io tokens use fo1_, fm2_, or fm1a_/fm1r_ prefixes.",
+        ),
+        SecretPattern(
+            name="Atlassian Token",
+            regex=r"(?<![A-Za-z0-9])ATATT3[A-Za-z0-9_\-=]{186}(?![A-Za-z0-9_\-=])",
+            severity=severity_for("Atlassian Token"),
+            description="Atlassian API tokens start with ATATT3 and a long payload (not a Jira keyword UUID).",
+        ),
     ]
 
 

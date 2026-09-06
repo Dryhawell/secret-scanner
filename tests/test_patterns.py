@@ -417,6 +417,43 @@ def test_doppler_token_is_not_digitalocean() -> None:
     assert "Doppler Token" not in _match_names("dp.pt." + "short")
 
 
+def test_pulumi_token_matches_fake_format() -> None:
+    fake = "pul-" + ("a" * 40)
+    names = _match_names(fake)
+    assert "Pulumi Token" in names
+    assert "DigitalOcean Token" not in names
+    assert "Pulumi Token" not in _match_names("pul-" + "short")
+    assert "Pulumi Token" not in _match_names("pul-" + ("a" * 39))
+
+
+def test_supabase_token_is_not_publishable() -> None:
+    secret = "sb_secret_" + ("A" * 31)
+    names = _match_names(secret)
+    assert "Supabase Token" in names
+    pat = "sbp_" + ("a" * 40)
+    assert "Supabase Token" in _match_names(pat)
+    assert "Supabase Token" in _match_names("sbp_v0_" + ("b" * 40))
+    assert "Supabase Token" not in _match_names("sb_publishable_" + ("C" * 31))
+    assert "Supabase Token" not in _match_names("sbp_" + "short")
+
+
+def test_flyio_token_matches_fo1_and_fm2() -> None:
+    org = "fo1_" + ("C" * 43)
+    names = _match_names(org)
+    assert "Fly.io Token" in names
+    machine = "fm2_" + ("D" * 100)
+    assert "Fly.io Token" in _match_names(machine)
+    assert "Fly.io Token" not in _match_names("fo1_" + "short")
+
+
+def test_atlassian_token_is_not_aws() -> None:
+    fake = "ATATT3" + ("E" * 186)
+    names = _match_names(fake)
+    assert "Atlassian Token" in names
+    assert "AWS Access Key ID" not in names
+    assert "Atlassian Token" not in _match_names("ATATT3" + "short")
+
+
 def test_default_catalog_is_non_empty_and_named() -> None:
     patterns = default_patterns()
     names = [pattern.name for pattern in patterns]
@@ -445,3 +482,7 @@ def test_default_catalog_is_non_empty_and_named() -> None:
     assert "Heroku Token" in names
     assert "Airtable Token" in names
     assert "Doppler Token" in names
+    assert "Pulumi Token" in names
+    assert "Supabase Token" in names
+    assert "Fly.io Token" in names
+    assert "Atlassian Token" in names

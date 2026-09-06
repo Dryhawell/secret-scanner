@@ -71,6 +71,10 @@ PATTERN_SEVERITY: dict[str, Severity] = {
     "Heroku Token": Severity.HIGH,
     "Airtable Token": Severity.HIGH,
     "Doppler Token": Severity.HIGH,
+    "Pulumi Token": Severity.HIGH,
+    "Supabase Token": Severity.HIGH,
+    "Fly.io Token": Severity.HIGH,
+    "Atlassian Token": Severity.HIGH,
     # MEDIUM: likely credentials, but often placeholders or local secrets.
     "Generic Password": Severity.MEDIUM,
     # MEDIUM: variable name is sensitive, value has no known vendor format.
