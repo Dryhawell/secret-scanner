@@ -454,6 +454,53 @@ def test_atlassian_token_is_not_aws() -> None:
     assert "Atlassian Token" not in _match_names("ATATT3" + "short")
 
 
+def test_terraform_token_matches_atlasv1() -> None:
+    fake = ("A" * 14) + ".atlasv1." + ("B" * 60)
+    names = _match_names(fake)
+    assert "Terraform Token" in names
+    assert "Vault Token" not in names
+    assert "AWS Access Key ID" not in names
+    assert "Terraform Token" not in _match_names(("A" * 14) + ".atlasv1." + "short")
+
+
+def test_teams_webhook_is_not_slack() -> None:
+    guid = ("a" * 8) + "-" + ("b" * 4) + "-" + ("c" * 4) + "-" + ("d" * 4) + "-" + ("e" * 12)
+    fake = (
+        "https://contoso.webhook.office.com/webhookb2/"
+        + guid
+        + "@"
+        + guid
+        + "/IncomingWebhook/"
+        + ("f" * 32)
+        + "/"
+        + guid
+    )
+    names = _match_names(fake)
+    assert "Microsoft Teams Webhook" in names
+    assert "Slack Webhook" not in names
+    assert "Discord Webhook" not in names
+    assert "Database Connection String" not in names
+    assert "Microsoft Teams Webhook" not in _match_names(
+        "https://contoso.webhook.office.com/webhookb2/short"
+    )
+
+
+def test_typeform_token_matches_fake_format() -> None:
+    fake = "tfp_" + ("a" * 59)
+    names = _match_names(fake)
+    assert "Typeform Token" in names
+    assert "Typeform Token" not in _match_names("tfp_" + "short")
+    assert "Typeform Token" not in _match_names("tfp_" + ("a" * 58))
+
+
+def test_dynatrace_token_matches_fake_format() -> None:
+    fake = "dt0c01." + ("a" * 24) + "." + ("b" * 64)
+    names = _match_names(fake)
+    assert "Dynatrace Token" in names
+    assert "Doppler Token" not in names
+    assert "Dynatrace Token" not in _match_names("dt0c01." + "short")
+
+
 def test_default_catalog_is_non_empty_and_named() -> None:
     patterns = default_patterns()
     names = [pattern.name for pattern in patterns]
@@ -486,3 +533,7 @@ def test_default_catalog_is_non_empty_and_named() -> None:
     assert "Supabase Token" in names
     assert "Fly.io Token" in names
     assert "Atlassian Token" in names
+    assert "Terraform Token" in names
+    assert "Microsoft Teams Webhook" in names
+    assert "Typeform Token" in names
+    assert "Dynatrace Token" in names

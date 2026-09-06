@@ -65,6 +65,10 @@ FORMAT_LOCKED_PATTERNS: frozenset[str] = frozenset(
         "Supabase Token",
         "Fly.io Token",
         "Atlassian Token",
+        "Terraform Token",
+        "Microsoft Teams Webhook",
+        "Typeform Token",
+        "Dynatrace Token",
     }
 )
 

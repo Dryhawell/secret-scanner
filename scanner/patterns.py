@@ -331,6 +331,43 @@ def default_patterns() -> list[SecretPattern]:
             severity=severity_for("Atlassian Token"),
             description="Atlassian API tokens start with ATATT3 and a long payload (not a Jira keyword UUID).",
         ),
+        SecretPattern(
+            name="Terraform Token",
+            regex=(
+                r"(?<![A-Za-z0-9])[A-Za-z0-9]{14}\.atlasv1\."
+                r"[A-Za-z0-9_\-=]{60,70}(?![A-Za-z0-9_\-=])"
+            ),
+            severity=severity_for("Terraform Token"),
+            description="HCP Terraform / Terraform Cloud tokens embed .atlasv1. (not a keyword-gated TFE UUID).",
+        ),
+        SecretPattern(
+            name="Microsoft Teams Webhook",
+            regex=(
+                r"https://[A-Za-z0-9-]+\.webhook\.office\.com/webhookb2/"
+                r"[A-Za-z0-9]{8}(?:-[A-Za-z0-9]{4}){3}-[A-Za-z0-9]{12}@"
+                r"[A-Za-z0-9]{8}(?:-[A-Za-z0-9]{4}){3}-[A-Za-z0-9]{12}/"
+                r"IncomingWebhook/[A-Za-z0-9]{32}/"
+                r"[A-Za-z0-9]{8}(?:-[A-Za-z0-9]{4}){3}-[A-Za-z0-9]{12}"
+            ),
+            severity=severity_for("Microsoft Teams Webhook"),
+            description="Teams incoming webhook URLs embed the secret in the path; the URL is the credential.",
+            flags=re.IGNORECASE,
+        ),
+        SecretPattern(
+            name="Typeform Token",
+            regex=r"(?<![A-Za-z0-9])tfp_[A-Za-z0-9\-_\.=]{59}(?![A-Za-z0-9\-_\.=])",
+            severity=severity_for("Typeform Token"),
+            description="Typeform personal tokens start with tfp_ and a 59-character payload.",
+        ),
+        SecretPattern(
+            name="Dynatrace Token",
+            regex=(
+                r"(?<![A-Za-z0-9])dt0c01\.[A-Za-z0-9]{24}\.[A-Za-z0-9]{64}"
+                r"(?![A-Za-z0-9])"
+            ),
+            severity=severity_for("Dynatrace Token"),
+            description="Dynatrace API tokens start with dt0c01. then 24 and 64 alphanumeric segments.",
+        ),
     ]
 
 

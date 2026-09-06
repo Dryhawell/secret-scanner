@@ -75,6 +75,10 @@ PATTERN_SEVERITY: dict[str, Severity] = {
     "Supabase Token": Severity.HIGH,
     "Fly.io Token": Severity.HIGH,
     "Atlassian Token": Severity.HIGH,
+    "Terraform Token": Severity.HIGH,
+    "Microsoft Teams Webhook": Severity.HIGH,
+    "Typeform Token": Severity.HIGH,
+    "Dynatrace Token": Severity.HIGH,
     # MEDIUM: likely credentials, but often placeholders or local secrets.
     "Generic Password": Severity.MEDIUM,
     # MEDIUM: variable name is sensitive, value has no known vendor format.

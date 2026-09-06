@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.44.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.45.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.44.0
+# Secret Scanner 1.45.0
 ```
 
 ## Why Secret Scanner?
@@ -40,7 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
-- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.44.0`)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.45.0`)
 - `--jobs` worker threads for file scans (default 1)
 - GitHub Action input `jobs` (empty = CLI default 1; `0` = CPU count)
 - Localhost HTML dashboard (`--dashboard`)
@@ -83,9 +83,9 @@ The pipeline is **pattern + context + placeholder filter + entropy (gated)**.
    `whsec_`, `AGE-SECRET-KEY-1`, `pscale_tkn_`, `PMAK-`, `lin_api_`, `glc_` / `glsa_`,
    `sq0atp-` / `sq0csp-`, `dapi`, `ntn_`, `nfp_`, `NRAK-` / `NRII-`, `sntryu_` / `sntrys_`,
    `hvs.` / `hvb.`, `HRKU-`, `dp.pt.` / `dp.st.`, `pul-`, `sb_secret_` / `sbp_`,
-   `fo1_` / `fm2_`, `ATATT3`,
+   `fo1_` / `fm2_`, `ATATT3`, `.atlasv1.`, `tfp_`, `dt0c01.`,
    PEM headers, JWTs, Stripe `sk_live_`, Azure `AccountKey=`,
-   Discord / Slack webhooks, …).
+   Discord / Slack / Teams webhooks, …).
 3. **Context** — sensitive names (`password`, `token`, `api_key`, …) with a
    long-enough value that has no vendor prefix.
 4. **Placeholder filter** — `YOUR_API_KEY`, `changeme`, `example`, and similar
@@ -148,6 +148,10 @@ AWS key (typical score around 90).
 | Supabase Token (`sb_secret_` / `sbp_`) | HIGH |
 | Fly.io Token (`fo1_` / `fm2_`) | HIGH |
 | Atlassian Token (`ATATT3`) | HIGH |
+| Terraform Token (`atlasv1`) | HIGH |
+| Microsoft Teams Webhook (`webhook.office.com`) | HIGH |
+| Typeform Token (`tfp_`) | HIGH |
+| Dynatrace Token (`dt0c01.`) | HIGH |
 | Telegram Bot Token | HIGH |
 | JWT | HIGH |
 | Generic API Key assignment | HIGH |
@@ -589,7 +593,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.44.0
+      - uses: Dryhawell/secret-scanner@v1.45.0
         with:
           include-hidden: true
           fail-on-severity: HIGH
@@ -615,7 +619,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.44.0
+      - uses: Dryhawell/secret-scanner@v1.45.0
         with:
           include-hidden: true
           sarif: true

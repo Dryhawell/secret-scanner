@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.45.0 — 2026-09-06
+
+### Added
+
+- Built-in formats: Terraform Cloud (`atlasv1`), Microsoft Teams webhooks,
+  Typeform (`tfp_`), Dynatrace (`dt0c01.`)
+
 ## 1.44.0 — 2026-09-06
 
 ### Added
