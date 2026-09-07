@@ -73,6 +73,10 @@ FORMAT_LOCKED_PATTERNS: frozenset[str] = frozenset(
         "Frame.io Token",
         "Duffel Token",
         "Vercel Token",
+        "EasyPost Token",
+        "Clojars Token",
+        "Alibaba Access Key ID",
+        "Groq API Key",
     }
 )
 

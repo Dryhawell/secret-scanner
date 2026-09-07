@@ -538,6 +538,42 @@ def test_vercel_token_is_not_stripe() -> None:
     assert "Vercel Token" not in _match_names("vcp_" + ("G" * 19))
 
 
+def test_easypost_token_matches_live_and_test() -> None:
+    live = "EZAK" + ("A" * 54)
+    names = _match_names(live)
+    assert "EasyPost Token" in names
+    assert "EasyPost Token" in _match_names("EZTK" + ("B" * 54))
+    assert "EasyPost Token" not in _match_names("EZAK" + "short")
+    assert "EasyPost Token" not in _match_names("EZAK" + ("A" * 53))
+
+
+def test_clojars_token_matches_fake_format() -> None:
+    fake = "CLOJARS_" + ("C" * 60)
+    names = _match_names(fake)
+    assert "Clojars Token" in names
+    assert "Clojars Token" not in _match_names("CLOJARS_" + "short")
+    assert "Clojars Token" not in _match_names("CLOJARS_" + ("C" * 59))
+
+
+def test_alibaba_access_key_is_not_aws() -> None:
+    fake = "LTAI" + ("D" * 20)
+    names = _match_names(fake)
+    assert "Alibaba Access Key ID" in names
+    assert "AWS Access Key ID" not in names
+    assert "Alibaba Access Key ID" not in _match_names("LTAI" + "short")
+    assert "Alibaba Access Key ID" not in _match_names("LTAI" + ("D" * 19))
+
+
+def test_groq_key_is_not_openai_or_stripe() -> None:
+    fake = "gsk_" + ("E" * 48)
+    names = _match_names(fake)
+    assert "Groq API Key" in names
+    assert "OpenAI API Key" not in names
+    assert "Stripe API Key" not in names
+    assert "Groq API Key" not in _match_names("gsk_" + "short")
+    assert "Groq API Key" not in _match_names("gsk_" + ("E" * 47))
+
+
 def test_default_catalog_is_non_empty_and_named() -> None:
     patterns = default_patterns()
     names = [pattern.name for pattern in patterns]
@@ -578,3 +614,7 @@ def test_default_catalog_is_non_empty_and_named() -> None:
     assert "Frame.io Token" in names
     assert "Duffel Token" in names
     assert "Vercel Token" in names
+    assert "EasyPost Token" in names
+    assert "Clojars Token" in names
+    assert "Alibaba Access Key ID" in names
+    assert "Groq API Key" in names

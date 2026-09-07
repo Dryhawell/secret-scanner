@@ -401,6 +401,30 @@ def default_patterns() -> list[SecretPattern]:
             severity=severity_for("Vercel Token"),
             description="Vercel tokens use vcp_, vci_, vca_, vcr_, or vck_ prefixes.",
         ),
+        SecretPattern(
+            name="EasyPost Token",
+            regex=r"(?<![A-Za-z0-9])EZ(?:AK|TK)[A-Za-z0-9]{54}(?![A-Za-z0-9])",
+            severity=severity_for("EasyPost Token"),
+            description="EasyPost live tokens start with EZAK; test tokens start with EZTK.",
+        ),
+        SecretPattern(
+            name="Clojars Token",
+            regex=r"(?<![A-Za-z0-9])CLOJARS_[A-Za-z0-9]{60}(?![A-Za-z0-9])",
+            severity=severity_for("Clojars Token"),
+            description="Clojars deploy tokens start with CLOJARS_ and 60 alphanumeric characters.",
+        ),
+        SecretPattern(
+            name="Alibaba Access Key ID",
+            regex=r"(?<![A-Za-z0-9])LTAI[A-Za-z0-9]{20}(?![A-Za-z0-9])",
+            severity=severity_for("Alibaba Access Key ID"),
+            description="Alibaba Cloud AccessKey IDs start with LTAI (not the keyword-gated secret).",
+        ),
+        SecretPattern(
+            name="Groq API Key",
+            regex=r"(?<![A-Za-z0-9])gsk_[A-Za-z0-9]{48}(?![A-Za-z0-9])",
+            severity=severity_for("Groq API Key"),
+            description="Groq API keys start with gsk_ followed by 48 alphanumeric characters.",
+        ),
     ]
 
 

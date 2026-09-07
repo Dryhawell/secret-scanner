@@ -83,6 +83,10 @@ PATTERN_SEVERITY: dict[str, Severity] = {
     "Frame.io Token": Severity.HIGH,
     "Duffel Token": Severity.HIGH,
     "Vercel Token": Severity.HIGH,
+    "EasyPost Token": Severity.HIGH,
+    "Clojars Token": Severity.HIGH,
+    "Alibaba Access Key ID": Severity.HIGH,
+    "Groq API Key": Severity.HIGH,
     # MEDIUM: likely credentials, but often placeholders or local secrets.
     "Generic Password": Severity.MEDIUM,
     # MEDIUM: variable name is sensitive, value has no known vendor format.

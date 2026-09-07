@@ -13,11 +13,11 @@ and it is not a secret manager.
 Detected values are **masked** in the terminal, JSON reports, and log files.
 Plaintext secrets are never printed or written to disk.
 
-**v1.46.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
+**v1.47.0** — Python 3.11+. Runtime is the standard library (`pytest` is for development only).
 
 ```text
 python main.py --version
-# Secret Scanner 1.46.0
+# Secret Scanner 1.47.0
 ```
 
 ## Why Secret Scanner?
@@ -40,7 +40,7 @@ This tool is a local / CI gate, not a replacement for vaults, IAM, or
 - Masked terminal output, JSON, SARIF 2.1.0, and HTML reports
 - `--staged` / `--changed` Git modes, `--history` for recent commits, `--since` for a branch delta
 - `--stdin` piped buffer (no temp file)
-- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.46.0`)
+- GitHub composite action (`uses: Dryhawell/secret-scanner@v1.47.0`)
 - `--jobs` worker threads for file scans (default 1)
 - GitHub Action input `jobs` (empty = CLI default 1; `0` = CPU count)
 - Localhost HTML dashboard (`--dashboard`)
@@ -85,6 +85,7 @@ The pipeline is **pattern + context + placeholder filter + entropy (gated)**.
    `hvs.` / `hvb.`, `HRKU-`, `dp.pt.` / `dp.st.`, `pul-`, `sb_secret_` / `sbp_`,
    `fo1_` / `fm2_`, `ATATT3`, `.atlasv1.`, `tfp_`, `dt0c01.`,
    `CCIPAT_` / `CCIPRJ_`, `fio-u-`, `duffel_live_`, `vcp_` / `vck_`,
+   `EZAK` / `EZTK`, `CLOJARS_`, `LTAI`, `gsk_`,
    PEM headers, JWTs, Stripe `sk_live_`, Azure `AccountKey=`,
    Discord / Slack / Teams webhooks, …).
 3. **Context** — sensitive names (`password`, `token`, `api_key`, …) with a
@@ -157,6 +158,10 @@ AWS key (typical score around 90).
 | Frame.io Token (`fio-u-`) | HIGH |
 | Duffel Token (`duffel_live_` / `duffel_test_`) | HIGH |
 | Vercel Token (`vcp_` / `vck_`) | HIGH |
+| EasyPost Token (`EZAK` / `EZTK`) | HIGH |
+| Clojars Token (`CLOJARS_`) | HIGH |
+| Alibaba Access Key ID (`LTAI`) | HIGH |
+| Groq API Key (`gsk_`) | HIGH |
 | Telegram Bot Token | HIGH |
 | JWT | HIGH |
 | Generic API Key assignment | HIGH |
@@ -598,7 +603,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.46.0
+      - uses: Dryhawell/secret-scanner@v1.47.0
         with:
           include-hidden: true
           fail-on-severity: HIGH
@@ -624,7 +629,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: Dryhawell/secret-scanner@v1.46.0
+      - uses: Dryhawell/secret-scanner@v1.47.0
         with:
           include-hidden: true
           sarif: true

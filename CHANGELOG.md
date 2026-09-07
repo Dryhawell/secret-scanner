@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.47.0 — 2026-09-07
+
+### Added
+
+- Built-in formats: EasyPost (`EZAK` / `EZTK`), Clojars (`CLOJARS_`),
+  Alibaba Cloud (`LTAI`), Groq (`gsk_`)
+
 ## 1.46.0 — 2026-09-07
 
 ### Added
