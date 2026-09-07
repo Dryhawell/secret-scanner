@@ -368,6 +368,39 @@ def default_patterns() -> list[SecretPattern]:
             severity=severity_for("Dynatrace Token"),
             description="Dynatrace API tokens start with dt0c01. then 24 and 64 alphanumeric segments.",
         ),
+        SecretPattern(
+            name="CircleCI Token",
+            regex=(
+                r"(?<![A-Za-z0-9])CCI(?:PAT|PRJ)_[A-Za-z0-9]{22}_[a-fA-F0-9]{40}"
+                r"(?![a-fA-F0-9])"
+            ),
+            severity=severity_for("CircleCI Token"),
+            description="CircleCI tokens use CCIPAT_ or CCIPRJ_ plus 22 id characters and 40 hex (not a bare SHA-1).",
+        ),
+        SecretPattern(
+            name="Frame.io Token",
+            regex=r"(?<![A-Za-z0-9])fio-u-[A-Za-z0-9_\-=]{64}(?![A-Za-z0-9_\-=])",
+            severity=severity_for("Frame.io Token"),
+            description="Frame.io developer tokens start with fio-u- and a 64-character payload.",
+        ),
+        SecretPattern(
+            name="Duffel Token",
+            regex=(
+                r"(?<![A-Za-z0-9])duffel_(?:test|live)_[A-Za-z0-9_\-=]{43}"
+                r"(?![A-Za-z0-9_\-=])"
+            ),
+            severity=severity_for("Duffel Token"),
+            description="Duffel API tokens use duffel_live_ or duffel_test_ plus 43 payload characters.",
+        ),
+        SecretPattern(
+            name="Vercel Token",
+            regex=(
+                r"(?<![A-Za-z0-9])(?:vcp|vci|vca|vcr|vck)_[A-Za-z0-9]{20,60}"
+                r"(?![A-Za-z0-9])"
+            ),
+            severity=severity_for("Vercel Token"),
+            description="Vercel tokens use vcp_, vci_, vca_, vcr_, or vck_ prefixes.",
+        ),
     ]
 
 

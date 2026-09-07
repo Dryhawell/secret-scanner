@@ -69,6 +69,10 @@ FORMAT_LOCKED_PATTERNS: frozenset[str] = frozenset(
         "Microsoft Teams Webhook",
         "Typeform Token",
         "Dynatrace Token",
+        "CircleCI Token",
+        "Frame.io Token",
+        "Duffel Token",
+        "Vercel Token",
     }
 )
 

@@ -501,6 +501,43 @@ def test_dynatrace_token_matches_fake_format() -> None:
     assert "Dynatrace Token" not in _match_names("dt0c01." + "short")
 
 
+def test_circleci_token_is_not_bare_hex() -> None:
+    personal = "CCIPAT_" + ("A" * 22) + "_" + ("a" * 40)
+    names = _match_names(personal)
+    assert "CircleCI Token" in names
+    project = "CCIPRJ_" + ("B" * 22) + "_" + ("b" * 40)
+    assert "CircleCI Token" in _match_names(project)
+    assert "CircleCI Token" not in _match_names("CCIPAT_" + "short")
+    assert "CircleCI Token" not in _match_names("a" * 40)
+
+
+def test_frameio_token_matches_fake_format() -> None:
+    fake = "fio-u-" + ("C" * 64)
+    names = _match_names(fake)
+    assert "Frame.io Token" in names
+    assert "Frame.io Token" not in _match_names("fio-u-" + "short")
+    assert "Frame.io Token" not in _match_names("fio-u-" + ("C" * 63))
+
+
+def test_duffel_token_matches_live_and_test() -> None:
+    live = "duffel_live_" + ("D" * 43)
+    names = _match_names(live)
+    assert "Duffel Token" in names
+    assert "Duffel Token" in _match_names("duffel_test_" + ("E" * 43))
+    assert "Duffel Token" not in _match_names("duffel_prod_" + ("F" * 43))
+    assert "Duffel Token" not in _match_names("duffel_live_" + "short")
+
+
+def test_vercel_token_is_not_stripe() -> None:
+    fake = "vcp_" + ("G" * 24)
+    names = _match_names(fake)
+    assert "Vercel Token" in names
+    assert "Stripe API Key" not in names
+    assert "Vercel Token" in _match_names("vck_" + ("H" * 24))
+    assert "Vercel Token" not in _match_names("vcp_" + "short")
+    assert "Vercel Token" not in _match_names("vcp_" + ("G" * 19))
+
+
 def test_default_catalog_is_non_empty_and_named() -> None:
     patterns = default_patterns()
     names = [pattern.name for pattern in patterns]
@@ -537,3 +574,7 @@ def test_default_catalog_is_non_empty_and_named() -> None:
     assert "Microsoft Teams Webhook" in names
     assert "Typeform Token" in names
     assert "Dynatrace Token" in names
+    assert "CircleCI Token" in names
+    assert "Frame.io Token" in names
+    assert "Duffel Token" in names
+    assert "Vercel Token" in names

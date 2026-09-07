@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.46.0 — 2026-09-07
+
+### Added
+
+- Built-in formats: CircleCI (`CCIPAT_` / `CCIPRJ_`), Frame.io (`fio-u-`),
+  Duffel (`duffel_live_` / `duffel_test_`), Vercel (`vcp_` / `vck_` / …)
+
 ## 1.45.0 — 2026-09-06
 
 ### Added

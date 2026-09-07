@@ -79,6 +79,10 @@ PATTERN_SEVERITY: dict[str, Severity] = {
     "Microsoft Teams Webhook": Severity.HIGH,
     "Typeform Token": Severity.HIGH,
     "Dynatrace Token": Severity.HIGH,
+    "CircleCI Token": Severity.HIGH,
+    "Frame.io Token": Severity.HIGH,
+    "Duffel Token": Severity.HIGH,
+    "Vercel Token": Severity.HIGH,
     # MEDIUM: likely credentials, but often placeholders or local secrets.
     "Generic Password": Severity.MEDIUM,
     # MEDIUM: variable name is sensitive, value has no known vendor format.
